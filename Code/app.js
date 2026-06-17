@@ -210,7 +210,7 @@ function renderSessionsFallback(lastId) {
 
 // ─── Global config ───
 const CONFIG = {
-  mode: 'cloud', // 'local' | 'cloud' | 'openai' | 'gemini' | 'azure'
+  mode: 'cloud', // 'local' | 'cloud' | 'openai' | 'gemini' | 'azure' | 'openai-compat'
   ollamaUrl: 'http://localhost:11434',
   apiKey: '',
   cloudModel: 'claude-sonnet-4-6',
@@ -222,7 +222,11 @@ const CONFIG = {
   azureKey: '',
   azureEndpoint: '',
   azureDeployment: 'gpt-4o',
-  azureModel: 'gpt-4o'
+  azureModel: 'gpt-4o',
+  // OpenAI Compatible provider (Siliconflow, Deepseek, Groq, Openrouter, Cerebras, etc.)
+  openaiCompatKey: '',
+  openaiCompatUrl: 'https://api.openai.com/v1',
+  openaiCompatModel: ''
 };
 
 const DATA_VERSION = 2;
@@ -534,6 +538,7 @@ function getProviderLabel() {
     case 'openai': return '🤖 OpenAI';
     case 'gemini': return '✦ Gemini';
     case 'azure': return '🔷 Azure';
+    case 'openai-compat': return '🔗 OpenAI Compatible';
     default: return 'Not set';
   }
 }
@@ -562,6 +567,9 @@ function openSetup() {
   document.getElementById('azure-endpoint-input').value = CONFIG.azureEndpoint;
   document.getElementById('azure-deployment-input').value = CONFIG.azureDeployment;
   document.getElementById('azure-model-select').value = CONFIG.azureModel;
+  document.getElementById('openai-compat-key-input').value = CONFIG.openaiCompatKey;
+  document.getElementById('openai-compat-url').value = CONFIG.openaiCompatUrl;
+  document.getElementById('openai-compat-model').value = CONFIG.openaiCompatModel;
   switchSetupTab(CONFIG.mode === 'local' ? 'local' : CONFIG.mode);
 }
 
@@ -582,6 +590,9 @@ function saveSetup() {
   CONFIG.azureEndpoint = document.getElementById('azure-endpoint-input').value.trim().replace(/\/$/, '');
   CONFIG.azureDeployment = document.getElementById('azure-deployment-input').value.trim();
   CONFIG.azureModel = document.getElementById('azure-model-select').value;
+  CONFIG.openaiCompatKey = document.getElementById('openai-compat-key-input').value.trim();
+  CONFIG.openaiCompatUrl = document.getElementById('openai-compat-url').value.trim().replace(/\/$/, '');
+  CONFIG.openaiCompatModel = document.getElementById('openai-compat-model').value.trim();
 
   // Validation
   if (CONFIG.mode === 'cloud' && !CONFIG.apiKey) {
@@ -894,6 +905,12 @@ function renderStage() {
     const w = document.createElement('div');
     w.className = 'warn-strip';
     w.innerHTML = `<span class="warn-strip-icon">⚠️</span><span>Azure not fully configured. <strong>Click "Connection Setup"</strong> in the sidebar.</span>`;
+    content.appendChild(w);
+  }
+  if ((!CONFIG.openaiCompatKey || !CONFIG.openaiCompatModel) && CONFIG.mode === 'openai-compat') {
+    const w = document.createElement('div');
+    w.className = 'warn-strip';
+    w.innerHTML = `<span class="warn-strip-icon">⚠️</span><span>OpenAI Compatible provider not configured. <strong>Click "Connection Setup"</strong> in the sidebar.</span>`;
     content.appendChild(w);
   }
 
@@ -1212,6 +1229,9 @@ Generate all AI deliverables for this stage and list open questions.`;
       case 'azure':
         raw = await callAzure(systemPrompt, userPrompt);
         break;
+      case 'openai-compat':
+        raw = await callOpenAICompat(systemPrompt, userPrompt);
+        break;
       default: // local / Ollama
         raw = await callOllama(systemPrompt, userPrompt, models[0]);
     }
@@ -1351,6 +1371,61 @@ async function callOllama(system, user, model) {
   const data = await r.json();
   if (!r.ok) throw new Error(data.error || 'Ollama error');
   return data.message?.content || '';
+}
+
+async function callOpenAICompat(system, user) {
+  const url = (CONFIG.openaiCompatUrl + '/chat/completions').replace(/\/+/g, '/').replace(':/', '://');
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + CONFIG.openaiCompatKey
+    },
+    body: JSON.stringify({
+      model: CONFIG.openaiCompatModel,
+      max_tokens: 2000,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user }
+      ]
+    })
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error?.message || 'API error: ' + (r.status));
+  return data.choices?.[0]?.message?.content || '';
+}
+
+async function testOpenAICompat() {
+  const key = document.getElementById('openai-compat-key-input').value.trim();
+  const url = document.getElementById('openai-compat-url').value.trim().replace(/\/$/, '');
+  const model = document.getElementById('openai-compat-model').value.trim();
+  const el = document.getElementById('openai-compat-test-result');
+  if (!key || !model) { el.textContent = '⚠️ Enter an API key and model first'; el.style.color = 'var(--warning)'; return; }
+  el.textContent = 'Testing…'; el.style.color = 'var(--text-3)';
+  try {
+    const apiUrl = (url + '/chat/completions').replace(/\/+/g, '/').replace(':/', '://');
+    const r = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({ model, max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
+    });
+    if (r.ok) {
+      el.textContent = '✅ Connected — ' + model;
+      el.style.color = 'var(--success)';
+    } else {
+      const d = await r.json();
+      el.textContent = '❌ ' + (d.error?.message || 'Connection failed');
+      el.style.color = 'var(--danger)';
+    }
+  } catch(e) {
+    el.textContent = '❌ ' + e.message;
+    el.style.color = 'var(--danger)';
+  }
+}
+
+function setCompatPreset(model, url) {
+  document.getElementById('openai-compat-model').value = model;
+  document.getElementById('openai-compat-url').value = url;
 }
 
 function addToHistory(stage, sd) {

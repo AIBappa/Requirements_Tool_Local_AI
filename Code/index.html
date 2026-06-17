@@ -21,6 +21,7 @@
       <div class="setup-tab" data-tab="openai" onclick="switchSetupTab('openai')">🤖 OpenAI</div>
       <div class="setup-tab" data-tab="gemini" onclick="switchSetupTab('gemini')">✦ Gemini</div>
       <div class="setup-tab" data-tab="azure" onclick="switchSetupTab('azure')">🔷 Azure</div>
+      <div class="setup-tab" data-tab="openai-compat" onclick="switchSetupTab('openai-compat')">🔗 OpenAI Compatible</div>
     </div>
 
     <!-- Local tab -->
@@ -152,6 +153,48 @@ ollama pull phi3:mini</div>
       <div class="setup-section">
         <button class="btn btn-primary" onclick="testAzure()" style="font-size:12px;padding:7px 14px;">Test Connection</button>
         <span id="azure-test-result" style="font-size:12px;color:var(--text-3);margin-left:10px;">Not tested yet</span>
+      </div>
+    </div>
+
+    <!-- OpenAI Compatible tab (Siliconflow, Deepseek, Groq, Openrouter, Cerebras, etc.) -->
+    <div class="setup-pane" id="tab-openai-compat">
+      <div class="setup-section">
+        <h3>API Key</h3>
+        <p>Works with any OpenAI-compatible API provider: <strong>Siliconflow</strong>, <strong>Deepseek</strong>, <strong>Groq</strong>, <strong>OpenRouter</strong>, <strong>Cerebras</strong>, and many more.</p>
+        <label class="setup-label">API Key</label>
+        <div class="setup-row">
+          <input class="setup-input" id="openai-compat-key-input" type="password" placeholder="Your API key" autocomplete="off" />
+          <button class="btn" onclick="toggleKeyVisibility('openai-compat-key-input')" style="font-size:12px;padding:7px 12px;">👁</button>
+        </div>
+      </div>
+      <div class="setup-section">
+        <h3>API Endpoint</h3>
+        <label class="setup-label">Base URL</label>
+        <input class="setup-input" id="openai-compat-url" type="text" placeholder="https://api.openai.com/v1" value="https://api.openai.com/v1" />
+        <p style="margin-top:8px;font-size:11.5px;color:var(--text-3);">
+          Common endpoints:
+          <code style="font-size:11px;">https://api.siliconflow.com/v1</code>,
+          <code style="font-size:11px;">https://api.deepseek.com/v1</code>,
+          <code style="font-size:11px;">https://api.groq.com/openai/v1</code>,
+          <code style="font-size:11px;">https://openrouter.ai/api/v1</code>,
+          <code style="font-size:11px;">https://api.cerebras.ai/v1</code>
+        </p>
+      </div>
+      <div class="setup-section">
+        <h3>Model</h3>
+        <label class="setup-label">Model name</label>
+        <input class="setup-input" id="openai-compat-model" type="text" placeholder="e.g. deepseek-chat, gpt-4o, mixtral-8x7b" />
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+          <button class="model-preset-btn" onclick="setCompatPreset('deepseek-chat', 'https://api.deepseek.com/v1')">DeepSeek Chat</button>
+          <button class="model-preset-btn" onclick="setCompatPreset('Pro/deepseek-ai/DeepSeek-V3', 'https://api.siliconflow.com/v1')">Siliconflow DeepSeek V3</button>
+          <button class="model-preset-btn" onclick="setCompatPreset('llama3-70b-8192', 'https://api.groq.com/openai/v1')">Groq Llama 3</button>
+          <button class="model-preset-btn" onclick="setCompatPreset('deepseek/deepseek-chat', 'https://openrouter.ai/api/v1')">OpenRouter DeepSeek</button>
+          <button class="model-preset-btn" onclick="setCompatPreset('llama3.1-8b', 'https://api.cerebras.ai/v1')">Cerebras Llama</button>
+        </div>
+      </div>
+      <div class="setup-section">
+        <button class="btn btn-primary" onclick="testOpenAICompat()" style="font-size:12px;padding:7px 14px;">Test Connection</button>
+        <span id="openai-compat-test-result" style="font-size:12px;color:var(--text-3);margin-left:10px;">Not tested yet</span>
       </div>
     </div>
 
