@@ -4,17 +4,18 @@ A local desktop tool for authoring software requirements using LLMs. Supports lo
 
 ## Getting Started
 
+### Option 1: Local Use (Laptop)
+
 1. **Open PowerShell** in the `Code\` directory:
    ```
    cd Code
    ```
 
-2. **Start a local HTTP server**:
+2. **Start the server**:
    ```
-   python -m http.server 8080
+   python server.py
    ```
-   > If you don't have Python, install it from [python.org](https://python.org).  
-   > On macOS/Linux, use `python3` instead of `python`.
+   This replaces the old `python -m http.server` command. It serves the web app, proxies Ollama API calls (so you can access from any device), and manages sessions on disk.
 
 3. **Open the app** in your browser:
    ```
@@ -29,20 +30,57 @@ A local desktop tool for authoring software requirements using LLMs. Supports lo
    - **Gemini** — Google Gemini models via API key
    - **Azure** — Azure OpenAI via API key and endpoint
 
+### Option 2: Access from Phone via Cloudflare Tunnel
+
+1. Run `python server.py` on your laptop (leave it running)
+2. In a separate terminal, start Cloudflare Tunnel:
+   ```
+   cloudflared tunnel --url http://localhost:8080
+   ```
+   Download `cloudflared` from [developers.cloudflare.com](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) if you don't have it.
+3. Cloudflare will give you a URL like `https://something.trycloudflare.com`
+4. Open that URL on your phone — everything works because the server proxies Ollama calls
+
+**No CORS issues, no separate browser, no extra config.** The phone just becomes another input device.
+
+### Option 3: Deploy on Coolify / Hetzner
+
+A `Coolify/Dockerfile` is included for easy deployment.
+
+1. Push this repository to GitHub
+2. In Coolify, create a new project and point it to your GitHub repo
+3. Select "Dockerfile" as the build type and set the build path to `Coolify/`
+4. Set the port to `80`
+5. Coolify will build and serve the app with HTTPS
+
+For Ollama access from a remote server, use Tailscale (free) to connect your laptop to the server.
+
+## Sessions
+
+The app now supports **multiple pipeline sessions** stored on the server:
+
+- **Create sessions** — each session tracks its own pipeline progress
+- **Resume anywhere** — work on your laptop, then open the same session from your phone
+- **Auto-save** — every change is saved to the server automatically
+- **Session list** — when you open the app, you'll see all your sessions
+
 ## Files
 
 | File | Purpose |
 |---|---|
+| `server.py` | Python backend — serves static files, proxies Ollama, manages sessions |
 | `index.html` | Main application page |
 | `app.js` | Application logic |
 | `pipeline-config.js` | Pipeline stages and model configuration |
 | `styles.css` | Styling |
+| `Coolify/Dockerfile` | Docker configuration for Coolify deployment |
 
 ## Requirements
 
-- **Python 3.x** — for the local HTTP server
+- **Python 3.x** — for the server
 - **Ollama** — required only for local mode ([ollama.com](https://ollama.com))
 - **API keys** — required only for cloud providers (Anthropic / OpenAI / Gemini / Azure)
+- **cloudflared** — optional, for remote access via Cloudflare Tunnel
 
 ## Pipeline Stages
 

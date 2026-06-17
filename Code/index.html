@@ -204,6 +204,7 @@ ollama pull phi3:mini</div>
   </div>
   <div id="stage-list"></div>
   <div id="sidebar-footer">
+    <button id="sessions-btn" onclick="goToSessions()">📂 Sessions</button>
     <button id="setup-reopen-btn" onclick="openSetup()">⚙️ Connection Setup</button>
     <div style="display:flex;gap:6px;margin-bottom:10px;">
       <button class="btn" onclick="exportPipelineJSON()" style="flex:1;font-size:10px;padding:6px 8px;" title="Export pipeline data as JSON">📤 Export</button>
@@ -217,8 +218,35 @@ ollama pull phi3:mini</div>
   </div>
 </nav>
 
-<!-- ─── Main ─── -->
-<div id="main">
+<!-- ─── Session Page (shown when no session is active) ─── -->
+<div id="session-page">
+  <div id="session-page-header">
+    <div>
+      <h1>📂 Pipeline Sessions</h1>
+      <p>Create or resume a pipeline session. Your data is saved on this server.</p>
+    </div>
+  </div>
+  <div id="session-list"></div>
+  <div id="session-empty" class="hidden">
+    <h2>No sessions yet</h2>
+    <p>Create your first pipeline session to get started generating software requirements.</p>
+  </div>
+  <div class="session-new-form" id="session-new-form">
+    <h3>➕ New Session</h3>
+    <div class="setup-row">
+      <input class="setup-input" id="new-session-name" type="text" placeholder="Session name (e.g. FieldFlow App)" />
+    </div>
+    <div class="setup-row">
+      <input class="setup-input" id="new-session-desc" type="text" placeholder="Description (optional)" />
+    </div>
+    <div class="new-session-actions">
+      <button class="btn btn-primary" onclick="createNewSession()">Create Session →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Pipeline View (shown when a session is active) ─── -->
+<div id="pipeline-view" class="hidden">
   <div id="progress-bar-wrap"><div id="progress-bar" style="width:0%"></div></div>
   <div id="topbar">
     <div id="topbar-stage-badge">Stage 1</div>

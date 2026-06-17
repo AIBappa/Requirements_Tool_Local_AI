@@ -1,3 +1,213 @@
+// ─── Session state ───
+let currentSessionId = null;
+
+// ─── Server API helpers ───
+async function apiFetch(path, options = {}) {
+  const url = window.location.origin + path;
+  const r = await fetch(url, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options
+  });
+  if (!r.ok) {
+    const errBody = await r.text().catch(() => '');
+    throw new Error(`Server error ${r.status}: ${errBody || r.statusText}`);
+  }
+  return r.json();
+}
+
+// ─── Session management ───
+async function loadSessions() {
+  // Try server first
+  try {
+    const sessions = await apiFetch('/api/sessions');
+    renderSessions(sessions);
+    return;
+  } catch (e) {
+    console.warn('Server unavailable, falling back to localStorage:', e.message);
+  }
+  // Fallback: look for stored session ID in localStorage
+  const lastId = localStorage.getItem('pipeline-last-session');
+  if (lastId) {
+    // Show a single "resume last" option
+    renderSessionsFallback(lastId);
+  } else {
+    renderSessions([]);
+  }
+}
+
+async function createNewSession() {
+  const name = document.getElementById('new-session-name').value.trim();
+  const desc = document.getElementById('new-session-desc').value.trim();
+  if (!name) { showToast('Please enter a session name'); return; }
+
+  try {
+    const session = await apiFetch('/api/sessions', {
+      method: 'POST',
+      body: JSON.stringify({ name, description: desc })
+    });
+    openSession(session.id);
+    showToast('Session created ✓');
+  } catch (e) {
+    showToast('Failed to create session: ' + e.message);
+  }
+}
+
+async function deleteSession(id, event) {
+  if (event) event.stopPropagation();
+  if (!confirm('Delete this session? This cannot be undone.')) return;
+  try {
+    await apiFetch('/api/sessions/' + id, { method: 'DELETE' });
+    loadSessions();
+    showToast('Session deleted');
+  } catch (e) {
+    showToast('Failed to delete: ' + e.message);
+  }
+}
+
+async function renameSession(id, newName) {
+  if (!newName.trim()) return;
+  try {
+    await apiFetch('/api/sessions/' + id, {
+      method: 'PUT',
+      body: JSON.stringify({ name: newName.trim() })
+    });
+    loadSessions();
+  } catch (e) {
+    showToast('Failed to rename: ' + e.message);
+  }
+}
+
+async function loadSessionData(sessionId) {
+  try {
+    const data = await apiFetch('/api/sessions/' + sessionId);
+    return data;
+  } catch (e) {
+    console.warn('Could not load session from server:', e.message);
+    return null;
+  }
+}
+
+async function saveSessionToServer() {
+  if (!currentSessionId) return;
+  try {
+    // Build full session data from current state
+    const data = {
+      currentStage: currentStage,
+      stageData: stageData,
+      config: {
+        mode: CONFIG.mode,
+        ollamaUrl: CONFIG.ollamaUrl,
+        cloudModel: CONFIG.cloudModel,
+        openaiModel: CONFIG.openaiModel,
+        geminiModel: CONFIG.geminiModel,
+        azureEndpoint: CONFIG.azureEndpoint,
+        azureDeployment: CONFIG.azureDeployment,
+        azureModel: CONFIG.azureModel
+      }
+    };
+    // Calculate completed count
+    const completed = PIPELINE.filter(s => stageData[s.id].completed).length;
+    data.completed = completed;
+    await apiFetch('/api/sessions/' + currentSessionId, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  } catch (e) {
+    console.warn('Failed to save to server:', e.message);
+  }
+}
+
+async function openSession(sessionId) {
+  currentSessionId = sessionId;
+  localStorage.setItem('pipeline-last-session', sessionId);
+  const data = await loadSessionData(sessionId);
+  if (data && data.stageData) {
+    // Restore stage data
+    PIPELINE.forEach(s => {
+      if (data.stageData[s.id]) {
+        Object.keys(data.stageData[s.id]).forEach(k => {
+          if (typeof data.stageData[s.id][k] === 'object' && !Array.isArray(data.stageData[s.id][k]) && data.stageData[s.id][k] !== null) {
+            stageData[s.id][k] = { ...stageData[s.id][k], ...data.stageData[s.id][k] };
+          } else {
+            stageData[s.id][k] = data.stageData[s.id][k];
+          }
+        });
+      }
+    });
+    if (data.currentStage) currentStage = data.currentStage;
+    if (data.config) Object.assign(CONFIG, data.config);
+  }
+  // Show pipeline view
+  document.getElementById('session-page').classList.add('hidden');
+  document.getElementById('pipeline-view').classList.remove('hidden');
+  buildSidebar();
+  renderStage();
+  updateSetupIndicator();
+}
+
+function goToSessions() {
+  saveCurrentInputs();
+  // Save before leaving
+  if (currentSessionId) saveSessionToServer();
+  currentSessionId = null;
+  document.getElementById('pipeline-view').classList.add('hidden');
+  document.getElementById('session-page').classList.remove('hidden');
+  loadSessions();
+}
+
+function renderSessions(sessions) {
+  const list = document.getElementById('session-list');
+  const empty = document.getElementById('session-empty');
+  list.innerHTML = '';
+  if (sessions.length === 0) {
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  sessions.forEach(s => {
+    const card = document.createElement('div');
+    card.className = 'session-card';
+    const isActive = s.updatedAt && (Date.now() - new Date(s.updatedAt).getTime()) < 3600000;
+    card.innerHTML = `
+      <div class="session-card-icon ${isActive ? 'active' : ''}">📁</div>
+      <div class="session-card-info">
+        <div class="session-card-name">${escHtml(s.name)}</div>
+        ${s.description ? `<div class="session-card-desc">${escHtml(s.description)}</div>` : ''}
+        <div class="session-card-meta">
+          <span class="session-card-stage">Stage ${s.currentStage || 1}/${s.totalStages || 9}</span>
+          <span>📅 ${s.updatedAt ? new Date(s.updatedAt).toLocaleString() : ''}</span>
+          ${s.completed > 0 ? `<span>✅ ${s.completed}/${s.totalStages || 9} done</span>` : ''}
+        </div>
+      </div>
+      <div class="session-card-actions">
+        <button class="btn btn-primary" onclick="event.stopPropagation(); openSession('${s.id}')">Open</button>
+        <button class="btn btn-danger" onclick="deleteSession('${s.id}', event)">🗑</button>
+      </div>`;
+    card.onclick = () => openSession(s.id);
+    list.appendChild(card);
+  });
+}
+
+function renderSessionsFallback(lastId) {
+  const list = document.getElementById('session-list');
+  const empty = document.getElementById('session-empty');
+  list.innerHTML = '';
+  empty.classList.add('hidden');
+  const card = document.createElement('div');
+  card.className = 'session-card';
+  card.innerHTML = `
+    <div class="session-card-icon active">📁</div>
+    <div class="session-card-info">
+      <div class="session-card-name">Last session</div>
+      <div class="session-card-meta">Saved in browser storage</div>
+    </div>
+    <div class="session-card-actions">
+      <button class="btn btn-primary" onclick="event.stopPropagation(); openSession('${lastId}')">Resume</button>
+    </div>`;
+  card.onclick = () => openSession(lastId);
+  list.appendChild(card);
+}
+
 // ─── Global config ───
 const CONFIG = {
   mode: 'cloud', // 'local' | 'cloud' | 'openai' | 'gemini' | 'azure'
@@ -1121,7 +1331,12 @@ async function callAzure(system, user) {
 }
 
 async function callOllama(system, user, model) {
-  const r = await fetch(CONFIG.ollamaUrl + '/api/chat', {
+  // Use the server proxy if available (same-origin), otherwise direct to Ollama
+  const isServerMode = window.location.protocol !== 'file:';
+  const url = isServerMode
+    ? '/api/ollama/chat'  // proxy through the Python server
+    : CONFIG.ollamaUrl + '/api/chat';
+  const r = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -1258,7 +1473,22 @@ function clearNotes() {
 // ─── Init ───
 initTheme();
 const loaded = loadFromStorage();
-buildSidebar();
-renderStage();
-updateSetupIndicator();
-if (loaded) showToast('Session restored from local storage ✓');
+// Start on the sessions page (unless server mode, then load sessions list)
+if (window.location.protocol !== 'file:') {
+  // Server mode — show session list
+  document.getElementById('session-page').classList.remove('hidden');
+  document.getElementById('pipeline-view').classList.add('hidden');
+  loadSessions();
+} else if (loaded) {
+  // Fallback: direct to localStorage session
+  document.getElementById('pipeline-view').classList.remove('hidden');
+  buildSidebar();
+  renderStage();
+  updateSetupIndicator();
+  showToast('Session restored from local storage ✓');
+} else {
+  // No session — show session page with empty state
+  document.getElementById('session-page').classList.remove('hidden');
+  document.getElementById('pipeline-view').classList.add('hidden');
+  loadSessions();
+}
