@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Author — LLM-Assisted Software Development</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ─── Setup Overlay ─── -->
+<div id="setup-overlay">
+  <div id="setup-box">
+    <div id="setup-box-header">
+      <h2>⚙️ Pipeline Setup</h2>
+      <p>Configure how the AI generation steps run. Choose a provider below.</p>
+    </div>
+    <div id="setup-tabs">
+      <div class="setup-tab active" data-tab="local" onclick="switchSetupTab('local')">🖥 Local (Ollama)</div>
+      <div class="setup-tab" data-tab="cloud" onclick="switchSetupTab('cloud')">☁️ Anthropic</div>
+      <div class="setup-tab" data-tab="openai" onclick="switchSetupTab('openai')">🤖 OpenAI</div>
+      <div class="setup-tab" data-tab="gemini" onclick="switchSetupTab('gemini')">✦ Gemini</div>
+      <div class="setup-tab" data-tab="azure" onclick="switchSetupTab('azure')">🔷 Azure</div>
+    </div>
+
+    <!-- Local tab -->
+    <div class="setup-pane active" id="tab-local">
+      <div class="setup-section">
+        <h3>Step 1 — Serve this page</h3>
+        <p>Browsers block <code>localhost</code> calls from a <code>file://</code> page (CORS). Serve it:</p>
+        <div class="cmd-block">python3 -m http.server 8080</div>
+        <p style="margin-top:10px;">Then open <code style="background:#e8e6f8;color:#312e81;padding:1px 5px;border-radius:4px;">http://localhost:8080/</code> in your browser.</p>
+      </div>
+      <div class="setup-section">
+        <h3>Step 2 — Start Ollama with CORS enabled</h3>
+        <div class="cmd-block"># macOS / Linux
+OLLAMA_ORIGINS="*" ollama serve</div>
+        <div class="cmd-block" style="margin-top:8px;"># Windows (PowerShell)
+$env:OLLAMA_ORIGINS="*"; ollama serve</div>
+      </div>
+      <div class="setup-section">
+        <h3>Step 3 — Pull models</h3>
+        <div class="cmd-block">ollama pull deepseek-r1:7b
+ollama pull qwen2.5-coder:7b
+ollama pull gemma3:4b
+ollama pull qwen3:4b
+ollama pull llama3:8b
+ollama pull phi3:mini</div>
+      </div>
+      <div class="setup-section">
+        <h3>Step 4 — Configure</h3>
+        <label class="setup-label">Ollama API base URL</label>
+        <input class="setup-input" id="ollama-url" type="text" value="http://localhost:11434" placeholder="http://localhost:11434" />
+        <div style="display:flex;gap:10px;align-items:center;margin-top:12px;">
+          <button class="btn btn-primary" onclick="testOllama()" style="font-size:12px;padding:7px 14px;">Test Ollama connection</button>
+          <span id="ollama-test-result" style="font-size:12px;color:var(--text-3);">Not tested yet</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cloud (Anthropic) tab -->
+    <div class="setup-pane" id="tab-cloud">
+      <div class="setup-section">
+        <h3>Anthropic API key</h3>
+        <label class="setup-label">API Key</label>
+        <div class="setup-row">
+          <input class="setup-input" id="api-key-input" type="password" placeholder="sk-ant-api03-..." autocomplete="off" />
+          <button class="btn" onclick="toggleKeyVisibility('api-key-input')" style="font-size:12px;padding:7px 12px;">👁</button>
+        </div>
+      </div>
+      <div class="setup-section">
+        <h3>Model</h3>
+        <select class="setup-input" id="cloud-model-select" style="font-family:var(--mono);">
+          <option value="claude-sonnet-4-6">claude-sonnet-4-6 (recommended)</option>
+          <option value="claude-opus-4-6">claude-opus-4-6 (most capable)</option>
+          <option value="claude-haiku-4-5-20251001">claude-haiku-4-5 (fastest)</option>
+        </select>
+      </div>
+      <div class="setup-section">
+        <button class="btn btn-primary" onclick="testCloudAPI()" style="font-size:12px;padding:7px 14px;">Test API Key</button>
+        <span id="cloud-test-result" style="font-size:12px;color:var(--text-3);margin-left:10px;">Not tested yet</span>
+      </div>
+    </div>
+
+    <!-- OpenAI tab -->
+    <div class="setup-pane" id="tab-openai">
+      <div class="setup-section">
+        <h3>OpenAI API key</h3>
+        <label class="setup-label">API Key</label>
+        <div class="setup-row">
+          <input class="setup-input" id="openai-key-input" type="password" placeholder="sk-..." autocomplete="off" />
+          <button class="btn" onclick="toggleKeyVisibility('openai-key-input')" style="font-size:12px;padding:7px 12px;">👁</button>
+        </div>
+      </div>
+      <div class="setup-section">
+        <h3>Model</h3>
+        <select class="setup-input" id="openai-model-select" style="font-family:var(--mono);">
+          <option value="gpt-4o">gpt-4o (recommended)</option>
+          <option value="gpt-4o-mini">gpt-4o-mini (faster)</option>
+          <option value="gpt-4-turbo">gpt-4-turbo</option>
+          <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+        </select>
+      </div>
+      <div class="setup-section">
+        <button class="btn btn-primary" onclick="testOpenAI()" style="font-size:12px;padding:7px 14px;">Test API Key</button>
+        <span id="openai-test-result" style="font-size:12px;color:var(--text-3);margin-left:10px;">Not tested yet</span>
+      </div>
+    </div>
+
+    <!-- Gemini tab -->
+    <div class="setup-pane" id="tab-gemini">
+      <div class="setup-section">
+        <h3>Gemini API key</h3>
+        <label class="setup-label">API Key</label>
+        <div class="setup-row">
+          <input class="setup-input" id="gemini-key-input" type="password" placeholder="AIza..." autocomplete="off" />
+          <button class="btn" onclick="toggleKeyVisibility('gemini-key-input')" style="font-size:12px;padding:7px 12px;">👁</button>
+        </div>
+      </div>
+      <div class="setup-section">
+        <h3>Model</h3>
+        <select class="setup-input" id="gemini-model-select" style="font-family:var(--mono);">
+          <option value="gemini-2.0-flash">gemini-2.0-flash (recommended)</option>
+          <option value="gemini-2.0-pro">gemini-2.0-pro (most capable)</option>
+          <option value="gemini-1.5-flash">gemini-1.5-flash (fastest)</option>
+          <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+        </select>
+      </div>
+      <div class="setup-section">
+        <button class="btn btn-primary" onclick="testGemini()" style="font-size:12px;padding:7px 14px;">Test API Key</button>
+        <span id="gemini-test-result" style="font-size:12px;color:var(--text-3);margin-left:10px;">Not tested yet</span>
+      </div>
+    </div>
+
+    <!-- Azure tab -->
+    <div class="setup-pane" id="tab-azure">
+      <div class="setup-section">
+        <h3>Azure OpenAI</h3>
+        <label class="setup-label">API Key</label>
+        <input class="setup-input" id="azure-key-input" type="password" placeholder="Your Azure API key" autocomplete="off" />
+        <label class="setup-label" style="margin-top:12px;">Endpoint URL</label>
+        <input class="setup-input" id="azure-endpoint-input" type="text" placeholder="https://your-resource.openai.azure.com" />
+        <label class="setup-label" style="margin-top:12px;">Deployment name</label>
+        <input class="setup-input" id="azure-deployment-input" type="text" placeholder="gpt-4o" />
+        <label class="setup-label" style="margin-top:12px;">Model (for reference)</label>
+        <select class="setup-input" id="azure-model-select" style="font-family:var(--mono);">
+          <option value="gpt-4o">gpt-4o</option>
+          <option value="gpt-4o-mini">gpt-4o-mini</option>
+          <option value="gpt-4-turbo">gpt-4-turbo</option>
+        </select>
+      </div>
+      <div class="setup-section">
+        <button class="btn btn-primary" onclick="testAzure()" style="font-size:12px;padding:7px 14px;">Test Connection</button>
+        <span id="azure-test-result" style="font-size:12px;color:var(--text-3);margin-left:10px;">Not tested yet</span>
+      </div>
+    </div>
+
+    <div class="setup-footer">
+      <span class="setup-status" id="setup-footer-status"></span>
+      <button class="btn" onclick="closeSetup()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSetup()">Save & Start Pipeline →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Model Picker Modal ─── -->
+<div id="model-modal" class="hidden">
+  <div id="model-box">
+    <div id="model-box-header">
+      <h3>Edit models for this stage</h3>
+      <button class="btn" onclick="closeModelModal()" style="font-size:12px;padding:5px 10px;">✕</button>
+    </div>
+    <div id="model-box-body">
+      <p style="font-size:12.5px;color:var(--text-3);margin-bottom:16px;line-height:1.6;">
+        Set the primary and optional secondary model for this stage. Use Ollama model names or cloud model strings.
+      </p>
+      <div class="model-slot">
+        <div class="model-slot-label">Primary model</div>
+        <div class="model-slot-row">
+          <input class="model-slot-input" id="model-primary" type="text" placeholder="e.g. deepseek-r1:7b" />
+        </div>
+        <div class="model-presets" id="primary-presets"></div>
+      </div>
+      <div class="model-slot" style="margin-top:16px;">
+        <div class="model-slot-label">Secondary model <span style="font-weight:400;color:var(--text-3);">(optional)</span></div>
+        <div class="model-slot-row">
+          <input class="model-slot-input" id="model-secondary" type="text" placeholder="e.g. gemma3:4b" />
+        </div>
+        <div class="model-presets" id="secondary-presets"></div>
+      </div>
+    </div>
+    <div id="model-box-footer">
+      <button class="btn" onclick="closeModelModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveModelOverride()">Apply to this stage</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Sidebar ─── -->
+<nav id="sidebar">
+  <div id="sidebar-header">
+    <h1>Pipeline Author</h1>
+    <p>LLM-Assisted Software Dev</p>
+  </div>
+  <div id="stage-list"></div>
+  <div id="sidebar-footer">
+    <button id="setup-reopen-btn" onclick="openSetup()">⚙️ Connection Setup</button>
+    <div style="display:flex;gap:6px;margin-bottom:10px;">
+      <button class="btn" onclick="exportPipelineJSON()" style="flex:1;font-size:10px;padding:6px 8px;" title="Export pipeline data as JSON">📤 Export</button>
+      <button class="btn" onclick="document.getElementById('import-file-input').click()" style="flex:1;font-size:10px;padding:6px 8px;" title="Import pipeline data from JSON">📥 Import</button>
+      <input type="file" id="import-file-input" accept=".json" style="display:none" onchange="importPipelineJSON(this.files[0])" />
+    </div>
+    <div id="sf-progress-text" style="margin-bottom:6px;font-size:11px;color:#6d6a9c;">Progress: 0 of 9 stages done</div>
+    <div style="height:3px;background:rgba(99,102,241,0.15);border-radius:2px;">
+      <div id="sf-progress-bar" style="height:100%;border-radius:2px;background:#6366f1;width:0%;transition:width 0.4s;"></div>
+    </div>
+  </div>
+</nav>
+
+<!-- ─── Main ─── -->
+<div id="main">
+  <div id="progress-bar-wrap"><div id="progress-bar" style="width:0%"></div></div>
+  <div id="topbar">
+    <div id="topbar-stage-badge">Stage 1</div>
+    <h2 id="topbar-title">Product Requirements Document (PRD)</h2>
+    <button id="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">🌙</button>
+    <div id="topbar-models" onclick="openModelModal()" title="Click to change models for this stage">
+      <span id="topbar-models-text">deepseek-r1:7b · gemma3:4b</span>
+      <span class="edit-icon">✏️</span>
+    </div>
+    <button class="btn" onclick="toggleHistory()">📋 History</button>
+  </div>
+  <div id="content"></div>
+  <div id="bottombar">
+    <span id="status-msg">Fill in the product introduction, then your manual inputs.</span>
+    <button class="btn btn-assist" onclick="toggleAssist()">💬 AI Assistant</button>
+    <button class="btn" id="btn-prev" onclick="goStage(currentStage-1)" disabled>← Previous</button>
+    <button class="btn btn-primary" id="btn-action" onclick="handleMainAction()">Generate AI Output →</button>
+    <div class="export-dropdown">
+      <button class="btn btn-success" onclick="toggleExportDropdown()">Export ▼</button>
+      <div class="export-dropdown-menu" id="export-dropdown-menu">
+        <button class="export-dropdown-item" onclick="exportPipelineJSON(); toggleExportDropdown();">📤 Export as JSON</button>
+        <button class="export-dropdown-item" onclick="exportPDF(); toggleExportDropdown();">📄 Export as PDF</button>
+        <button class="export-dropdown-item" onclick="exportDOCX(); toggleExportDropdown();">📝 Export as DOCX</button>
+      </div>
+    </div>
+    <button class="btn btn-success" id="btn-next" onclick="goStage(currentStage+1)" disabled>Next Stage →</button>
+  </div>
+</div>
+
+<!-- ─── AI Assistant Panel ─── -->
+<div id="ai-assist-panel">
+  <div id="ai-assist-header">
+    <div id="ai-assist-title">💬 AI Assistant</div>
+    <div class="assist-tab-bar">
+      <div class="assist-tab active" onclick="switchAssistTab('chatgpt')">
+        <div class="assist-tab-icon" style="background:#10a37f;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M22.28 9.28a5.996 5.996 0 00-.52-4.93 6.07 6.07 0 00-6.53-2.92A5.99 5.99 0 009.87 0a6.07 6.07 0 00-5.79 4.2 5.995 5.995 0 00-4 2.9 6.07 6.07 0 00.75 7.12 5.99 5.99 0 00.52 4.93 6.07 6.07 0 006.53 2.92A5.99 5.99 0 0014.13 24a6.07 6.07 0 005.8-4.21 5.99 5.99 0 003.99-2.9 6.07 6.07 0 00-.64-7.6v.09z"/></svg>
+        </div>
+        ChatGPT
+      </div>
+      <div class="assist-tab" onclick="switchAssistTab('claude')">
+        <div class="assist-tab-icon" style="background:#d97757;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M13.83 8.44L12 3.28 10.17 8.44H5.08l4.2 3.05-1.6 4.93L12 13.35l4.32 3.07-1.6-4.93 4.2-3.05z"/></svg>
+        </div>
+        Claude
+      </div>
+      <div class="assist-tab" onclick="switchAssistTab('gemini')">
+        <div class="assist-tab-icon" style="background:#4285f4;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+        </div>
+        Gemini
+      </div>
+      <div class="assist-tab" onclick="switchAssistTab('perplexity')">
+        <div class="assist-tab-icon" style="background:#20b2aa;">
+          <span style="color:white;font-size:10px;font-weight:700;">P</span>
+        </div>
+        Perplexity
+      </div>
+      <div class="assist-tab" onclick="switchAssistTab('scratchpad')">
+        <div class="assist-tab-icon" style="background:#6366f1;">
+          <span style="color:white;font-size:10px;">📝</span>
+        </div>
+        Notes
+      </div>
+    </div>
+    <button id="ai-assist-close" onclick="toggleAssist()" title="Close assistant">✕</button>
+  </div>
+
+  <div id="ai-assist-body">
+    <!-- ChatGPT -->
+    <div class="assist-pane active" id="assist-pane-chatgpt">
+      <div class="assist-blocked">
+        <div class="assist-blocked-icon">🤖</div>
+        <h4>ChatGPT</h4>
+        <p>ChatGPT blocks embedding in iframes. Open it in a new tab, ask your question, copy the answer, then paste it into your Notes tab.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+          <a class="assist-open-btn primary" href="https://chatgpt.com" target="_blank" rel="noopener">Open ChatGPT ↗</a>
+          <button class="assist-open-btn" onclick="switchAssistTab('scratchpad')">📝 Open Notes tab</button>
+        </div>
+        <div style="margin-top:18px;padding:12px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;width:100%;max-width:480px;">
+          <div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em;">Suggested prompt template</div>
+          <div id="chatgpt-prompt-box" style="font-family:var(--mono);font-size:12px;color:var(--text-2);line-height:1.7;white-space:pre-wrap;"></div>
+          <button onclick="copyPrompt('chatgpt-prompt-box')" style="margin-top:8px;font-size:11px;padding:4px 12px;" class="assist-open-btn">Copy prompt</button>
+          <span id="copy-notice-chatgpt" style="font-size:11px;color:var(--success);margin-left:8px;opacity:0;transition:opacity 0.3s;">Copied!</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Claude -->
+    <div class="assist-pane" id="assist-pane-claude">
+      <div class="assist-blocked">
+        <div class="assist-blocked-icon" style="font-size:32px;">◆</div>
+        <h4>Claude (claude.ai)</h4>
+        <p>Claude.ai blocks embedding in iframes. Open it in a new tab.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+          <a class="assist-open-btn primary" href="https://claude.ai/new" target="_blank" rel="noopener">Open Claude ↗</a>
+          <button class="assist-open-btn" onclick="switchAssistTab('scratchpad')">📝 Open Notes tab</button>
+        </div>
+        <div style="margin-top:18px;padding:12px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;width:100%;max-width:480px;">
+          <div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em;">Suggested prompt template</div>
+          <div id="claude-prompt-box" style="font-family:var(--mono);font-size:12px;color:var(--text-2);line-height:1.7;white-space:pre-wrap;"></div>
+          <button onclick="copyPrompt('claude-prompt-box')" style="margin-top:8px;font-size:11px;padding:4px 12px;" class="assist-open-btn">Copy prompt</button>
+          <span id="copy-notice-claude" style="font-size:11px;color:var(--success);margin-left:8px;opacity:0;transition:opacity 0.3s;">Copied!</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gemini -->
+    <div class="assist-pane" id="assist-pane-gemini">
+      <div class="assist-blocked">
+        <div class="assist-blocked-icon">✦</div>
+        <h4>Google Gemini</h4>
+        <p>Gemini blocks iframe embedding. Open it in a new tab.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+          <a class="assist-open-btn primary" href="https://gemini.google.com" target="_blank" rel="noopener">Open Gemini ↗</a>
+          <button class="assist-open-btn" onclick="switchAssistTab('scratchpad')">📝 Open Notes tab</button>
+        </div>
+        <div style="margin-top:18px;padding:12px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;width:100%;max-width:480px;">
+          <div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em;">Suggested prompt template</div>
+          <div id="gemini-prompt-box" style="font-family:var(--mono);font-size:12px;color:var(--text-2);line-height:1.7;white-space:pre-wrap;"></div>
+          <button onclick="copyPrompt('gemini-prompt-box')" style="margin-top:8px;font-size:11px;padding:4px 12px;" class="assist-open-btn">Copy prompt</button>
+          <span id="copy-notice-gemini" style="font-size:11px;color:var(--success);margin-left:8px;opacity:0;transition:opacity 0.3s;">Copied!</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Perplexity -->
+    <div class="assist-pane" id="assist-pane-perplexity">
+      <div class="assist-blocked">
+        <div class="assist-blocked-icon">🔍</div>
+        <h4>Perplexity</h4>
+        <p>Best for quick research and definitions — it cites sources so you can verify technical terms.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+          <a class="assist-open-btn primary" href="https://perplexity.ai" target="_blank" rel="noopener">Open Perplexity ↗</a>
+          <button class="assist-open-btn" onclick="switchAssistTab('scratchpad')">📝 Open Notes tab</button>
+        </div>
+        <div style="margin-top:18px;padding:12px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;width:100%;max-width:480px;">
+          <div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em;">Suggested prompt template</div>
+          <div id="perplexity-prompt-box" style="font-family:var(--mono);font-size:12px;color:var(--text-2);line-height:1.7;white-space:pre-wrap;"></div>
+          <button onclick="copyPrompt('perplexity-prompt-box')" style="margin-top:8px;font-size:11px;padding:4px 12px;" class="assist-open-btn">Copy prompt</button>
+          <span id="copy-notice-perplexity" style="font-size:11px;color:var(--success);margin-left:8px;opacity:0;transition:opacity 0.3s;">Copied!</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scratchpad / Notes -->
+    <div class="assist-pane" id="assist-pane-scratchpad">
+      <div id="assist-scratchpad-header">
+        <span>Paste AI answers here, jot notes, draft wording — your private scratchpad while you fill in this stage.</span>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span id="assist-copy-notice">Copied!</span>
+          <button class="assist-open-btn" style="font-size:11px;padding:4px 12px;" onclick="copyAllNotes()">Copy all</button>
+          <button class="assist-open-btn" style="font-size:11px;padding:4px 12px;" onclick="clearNotes()">Clear</button>
+        </div>
+      </div>
+      <textarea id="assist-scratchpad" placeholder="Paste answers from ChatGPT / Claude / Gemini here…&#10;&#10;Or jot down ideas, terminology you looked up, wording you want to use in your requirements — anything you need to reference while authoring this stage."></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- ─── History panel ─── -->
+<div id="history-panel">
+  <div id="history-header">
+    <h3>Session History</h3>
+    <button class="btn" onclick="toggleHistory()">✕</button>
+  </div>
+  <div id="history-content"><p style="color:var(--text-3);font-size:12px;">No history yet.</p></div>
+</div>
+
+<div id="toast"></div>
+
+<script src="pipeline-config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

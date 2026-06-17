@@ -1,0 +1,1733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Author — LLM-Assisted Software Development</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@300;400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --sidebar-bg: #16123a;
+    --sidebar-active: #312e7a;
+    --sidebar-hover: #252060;
+    --sidebar-text: #a5b4fc;
+    --sidebar-muted: #6d6a9c;
+    --sidebar-width: 280px;
+    --surface: #ffffff;
+    --surface-2: #f8f7ff;
+    --surface-3: #f0effe;
+    --border: #e2e0f5;
+    --border-strong: #c4c0e8;
+    --text: #1e1b3a;
+    --text-2: #4a4770;
+    --text-3: #7c7aaa;
+    --amber-bg: #fffbeb;
+    --amber-border: #fcd34d;
+    --amber-text: #92400e;
+    --teal-bg: #f0fdf4;
+    --teal-border: #6ee7b7;
+    --teal-text: #065f46;
+    --coral-bg: #fff1f0;
+    --coral-border: #fca5a5;
+    --coral-text: #7f1d1d;
+    --indigo-bg: #eef2ff;
+    --indigo-border: #a5b4fc;
+    --indigo-text: #312e81;
+    --purple-bg: #faf5ff;
+    --purple-border: #c4b5fd;
+    --purple-text: #4c1d95;
+    --accent: #6366f1;
+    --accent-dark: #4338ca;
+    --gate-bg: #1e1b4b;
+    --success: #059669;
+    --warning: #d97706;
+    --danger: #dc2626;
+    --font: 'Inter', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  body { font-family: var(--font); background: #eef0f8; color: var(--text); height: 100vh; overflow: hidden; display: flex; }
+
+  /* ─── Setup overlay ─── */
+  #setup-overlay {
+    position: fixed; inset: 0; background: rgba(16,12,58,0.85);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 900; backdrop-filter: blur(3px);
+  }
+  #setup-overlay.hidden { display: none; }
+  #setup-box {
+    background: white; border-radius: 14px; width: 640px; max-width: 95vw;
+    max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 60px rgba(0,0,0,0.3);
+  }
+  #setup-box-header {
+    padding: 24px 28px 0;
+    border-bottom: none;
+  }
+  #setup-box-header h2 { font-size: 18px; font-weight: 600; color: var(--text); }
+  #setup-box-header p { font-size: 13px; color: var(--text-3); margin-top: 6px; line-height: 1.6; }
+  #setup-tabs {
+    display: flex; gap: 0; padding: 20px 28px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .setup-tab {
+    padding: 8px 20px; font-size: 13px; font-weight: 500;
+    cursor: pointer; border-bottom: 2px solid transparent;
+    color: var(--text-3); margin-bottom: -1px; transition: all 0.15s;
+  }
+  .setup-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .setup-tab:hover:not(.active) { color: var(--text-2); }
+  .setup-pane { padding: 24px 28px; display: none; }
+  .setup-pane.active { display: block; }
+  .setup-section {
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px 20px; margin-bottom: 16px;
+  }
+  .setup-section h3 { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+  .setup-section p { font-size: 12.5px; color: var(--text-2); line-height: 1.65; }
+  .setup-section code {
+    font-family: var(--mono); font-size: 11.5px;
+    background: #e8e6f8; color: #312e81; padding: 2px 6px; border-radius: 4px;
+  }
+  .cmd-block {
+    font-family: var(--mono); font-size: 12px; background: #1e1b4b; color: #c7d2fe;
+    padding: 10px 14px; border-radius: 7px; margin-top: 10px; line-height: 1.8;
+    white-space: pre; overflow-x: auto;
+  }
+  .setup-label { font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 6px; display: block; }
+  .setup-input {
+    width: 100%; border: 1px solid var(--border-strong); border-radius: 7px;
+    padding: 9px 12px; font-family: var(--mono); font-size: 13px; color: var(--text);
+    outline: none; transition: border 0.15s;
+  }
+  .setup-input:focus { border-color: var(--accent); }
+  .setup-row { display: flex; gap: 10px; align-items: flex-end; }
+  .setup-row .setup-input { flex: 1; }
+  .setup-footer { padding: 16px 28px 24px; display: flex; align-items: center; gap: 12px; }
+  .setup-status { flex: 1; font-size: 12px; }
+  .setup-status.ok { color: var(--success); }
+  .setup-status.err { color: var(--danger); }
+  .pill-badge {
+    display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 8px;
+    border-radius: 10px; margin-left: 8px; vertical-align: middle;
+  }
+  .pill-badge.local { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+  .pill-badge.cloud { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+
+  /* ─── Model picker modal ─── */
+  #model-modal {
+    position: fixed; inset: 0; background: rgba(16,12,58,0.6);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 800;
+  }
+  #model-modal.hidden { display: none; }
+  #model-box {
+    background: white; border-radius: 12px; width: 520px; max-width: 95vw;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.25); overflow: hidden;
+  }
+  #model-box-header {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  #model-box-header h3 { font-size: 14px; font-weight: 600; }
+  #model-box-body { padding: 20px; }
+  .model-slot { margin-bottom: 14px; }
+  .model-slot-label {
+    font-size: 11px; font-weight: 600; color: var(--text-3);
+    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;
+  }
+  .model-slot-row { display: flex; gap: 8px; align-items: center; }
+  .model-slot-input {
+    flex: 1; border: 1px solid var(--border-strong); border-radius: 7px;
+    padding: 8px 12px; font-family: var(--mono); font-size: 12.5px; color: var(--text);
+    outline: none;
+  }
+  .model-slot-input:focus { border-color: var(--accent); }
+  .model-presets {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+  }
+  .model-preset-btn {
+    font-size: 11px; font-family: var(--mono); padding: 3px 10px;
+    border-radius: 20px; border: 1px solid var(--border-strong);
+    background: var(--surface-2); color: var(--text-2);
+    cursor: pointer; transition: all 0.1s;
+  }
+  .model-preset-btn:hover { background: var(--indigo-bg); color: var(--indigo-text); border-color: var(--indigo-border); }
+  .model-preset-btn.cloud-preset { border-color: var(--teal-border); color: var(--teal-text); background: var(--teal-bg); }
+  #model-box-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
+
+  /* ─── Sidebar ─── */
+  #sidebar {
+    width: var(--sidebar-width); background: var(--sidebar-bg);
+    display: flex; flex-direction: column; flex-shrink: 0;
+    overflow: hidden; border-right: 1px solid rgba(99,102,241,0.2);
+  }
+  #sidebar-header { padding: 20px 18px 16px; border-bottom: 1px solid rgba(99,102,241,0.15); }
+  #sidebar-header h1 { font-size: 13px; font-weight: 600; color: #e0e7ff; letter-spacing: 0.05em; text-transform: uppercase; }
+  #sidebar-header p { font-size: 11px; color: var(--sidebar-muted); margin-top: 4px; }
+  #stage-list { flex: 1; overflow-y: auto; padding: 8px 0; scrollbar-width: thin; scrollbar-color: #312e7a transparent; }
+  .stage-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 14px;
+    cursor: pointer; transition: background 0.15s; border-left: 2px solid transparent;
+  }
+  .stage-item:hover { background: var(--sidebar-hover); }
+  .stage-item.active { background: var(--sidebar-active); border-left-color: #818cf8; }
+  .stage-item.completed .stage-num { background: var(--success); color: white; }
+  .stage-item.gate .stage-num { background: #991b1b; color: #fca5a5; font-size: 10px; }
+  .stage-num {
+    width: 22px; height: 22px; border-radius: 50%; background: rgba(99,102,241,0.2);
+    color: var(--sidebar-text); font-size: 10px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .stage-info { flex: 1; min-width: 0; }
+  .stage-name { font-size: 11.5px; font-weight: 500; color: #c7d2fe; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stage-item.active .stage-name { color: #e0e7ff; }
+  .stage-type-tag { font-size: 9.5px; color: var(--sidebar-muted); margin-top: 1px; }
+  .stage-item.gate .stage-type-tag { color: #f87171; }
+  .stage-status-dot { width: 6px; height: 6px; border-radius: 50%; background: transparent; border: 1px solid var(--sidebar-muted); flex-shrink: 0; }
+  .stage-item.completed .stage-status-dot { background: var(--success); border-color: var(--success); }
+  .stage-item.active .stage-status-dot { background: #818cf8; border-color: #818cf8; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  #sidebar-footer { padding: 12px 14px; border-top: 1px solid rgba(99,102,241,0.15); }
+  #setup-reopen-btn {
+    width: 100%; margin-bottom: 10px; padding: 7px 10px;
+    background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.25);
+    border-radius: 7px; color: #a5b4fc; font-size: 11px; font-weight: 500;
+    cursor: pointer; text-align: left; display: flex; align-items: center; gap: 7px;
+    transition: background 0.15s;
+  }
+  #setup-reopen-btn:hover { background: rgba(99,102,241,0.2); }
+
+  /* ─── Main area ─── */
+  #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  #topbar {
+    background: white; border-bottom: 1px solid var(--border);
+    padding: 14px 24px; display: flex; align-items: center; gap: 16px; flex-shrink: 0;
+  }
+  #topbar-stage-badge {
+    font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px;
+    background: var(--indigo-bg); color: var(--indigo-text); border: 1px solid var(--indigo-border);
+    white-space: nowrap;
+  }
+  #topbar-stage-badge.gate { background: var(--coral-bg); color: var(--coral-text); border-color: var(--coral-border); }
+  #topbar h2 { font-size: 15px; font-weight: 600; color: var(--text); flex: 1; }
+  #topbar-models {
+    font-size: 11px; color: var(--indigo-text); font-family: var(--mono);
+    background: var(--indigo-bg); padding: 4px 12px; border-radius: 20px;
+    border: 1px solid var(--indigo-border); cursor: pointer; display: flex; align-items: center; gap: 6px;
+    transition: background 0.15s; white-space: nowrap;
+  }
+  #topbar-models:hover { background: #dde3ff; }
+  #topbar-models .edit-icon { font-size: 10px; opacity: 0.6; }
+
+  #progress-bar-wrap { height: 2px; background: rgba(99,102,241,0.1); }
+  #progress-bar { height: 100%; background: linear-gradient(90deg, #6366f1, #818cf8); transition: width 0.4s; }
+
+  #content { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* ─── Section cards ─── */
+  .section-card { background: white; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .section-header {
+    display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+    border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .section-header.human { background: var(--amber-bg); color: var(--amber-text); border-bottom-color: var(--amber-border); }
+  .section-header.ai { background: var(--teal-bg); color: var(--teal-text); border-bottom-color: var(--teal-border); }
+  .section-header.review { background: var(--coral-bg); color: var(--coral-text); border-bottom-color: var(--coral-border); }
+  .section-header.gate-header { background: var(--gate-bg); color: #e0e7ff; }
+  .section-header.approved { background: #f0fdf4; color: #065f46; border-bottom-color: #6ee7b7; }
+  .section-icon { font-size: 14px; }
+  .section-body { padding: 16px; }
+
+  /* ─── PRD intro grid ─── */
+  .intro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .intro-field { display: flex; flex-direction: column; }
+  .intro-field.full { grid-column: 1 / -1; }
+  .intro-label { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 5px; }
+  .intro-input {
+    border: 1px solid var(--border-strong); border-radius: 7px; padding: 8px 11px;
+    font-family: var(--font); font-size: 13px; color: var(--text); outline: none;
+    transition: border 0.15s; background: white;
+  }
+  .intro-input:focus { border-color: var(--accent); }
+  textarea.intro-input { resize: vertical; min-height: 70px; line-height: 1.6; }
+
+  /* ─── Deliverables list ─── */
+  .deliverables-list { display: flex; flex-direction: column; gap: 12px; }
+  .deliverable-item { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .deliverable-label {
+    font-size: 11px; font-weight: 600; color: var(--text-2); padding: 7px 12px;
+    background: var(--surface-2); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .d-badge { font-size: 9px; padding: 2px 7px; border-radius: 10px; }
+  .d-badge.manual { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+  .d-badge.ai-gen { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+  textarea.d-input {
+    width: 100%; border: none; outline: none; resize: vertical;
+    font-family: var(--font); font-size: 13px; color: var(--text);
+    padding: 10px 12px; background: white; min-height: 80px; line-height: 1.6;
+  }
+  .ai-output-box {
+    padding: 12px; font-family: var(--mono); font-size: 12px; color: var(--teal-text);
+    background: var(--teal-bg); line-height: 1.7; white-space: pre-wrap; min-height: 60px;
+  }
+  .ai-loading { display: flex; align-items: center; gap: 8px; padding: 16px; color: var(--text-3); font-size: 13px; }
+  .spinner {
+    width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─── QA section ─── */
+  .qa-list { display: flex; flex-direction: column; gap: 16px; }
+  .qa-item { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .qa-question {
+    padding: 10px 14px; background: var(--indigo-bg);
+    border-bottom: 1px solid var(--indigo-border); font-size: 12.5px;
+    color: var(--indigo-text); font-weight: 500; display: flex; gap: 8px; align-items: flex-start;
+  }
+  .qa-q-num {
+    font-size: 10px; font-weight: 700; background: #4338ca; color: white;
+    padding: 1px 6px; border-radius: 10px; flex-shrink: 0; margin-top: 1px;
+  }
+  textarea.qa-answer {
+    border: none; outline: none; resize: vertical; font-family: var(--font);
+    font-size: 13px; color: var(--text); padding: 10px 14px; background: white;
+    min-height: 60px; line-height: 1.6; width: 100%;
+  }
+  .qa-link-bar {
+    padding: 6px 12px; background: var(--surface-2); border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--text-3); display: flex; align-items: center; gap: 6px;
+  }
+  .linked-section-tag {
+    font-size: 10px; background: var(--purple-bg); color: var(--purple-text);
+    border: 1px solid var(--purple-border); padding: 2px 8px; border-radius: 10px;
+  }
+
+  /* ─── Gate review ─── */
+  .review-checklist { display: flex; flex-direction: column; gap: 10px; }
+  .review-item { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .review-question { padding: 10px 14px; background: #fff7ed; border-bottom: 1px solid #fed7aa; font-size: 12.5px; color: #7c2d12; font-weight: 500; }
+  .review-options { display: flex; }
+  .review-opt {
+    flex: 1; padding: 8px 12px; text-align: center; font-size: 12px; font-weight: 500;
+    cursor: pointer; border: none; background: white; color: var(--text-2);
+    border-right: 1px solid var(--border); transition: background 0.1s;
+  }
+  .review-opt:last-child { border-right: none; }
+  .review-opt:hover { background: var(--surface-2); }
+  .review-opt.selected-yes { background: #d1fae5; color: #065f46; }
+  .review-opt.selected-partial { background: #fef9c3; color: #713f12; }
+  .review-opt.selected-no { background: #fee2e2; color: #7f1d1d; }
+  .review-notes {
+    width: 100%; border: none; border-top: 1px solid var(--border); outline: none; resize: vertical;
+    font-family: var(--font); font-size: 12px; color: var(--text); padding: 8px 14px;
+    background: var(--surface-2); min-height: 48px; display: none;
+  }
+  .review-notes.visible { display: block; }
+
+  /* ─── Bottom toolbar ─── */
+  #bottombar {
+    background: white; border-top: 1px solid var(--border);
+    padding: 12px 24px; display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
+    border-radius: 7px; font-size: 13px; font-weight: 500; cursor: pointer;
+    border: 1px solid var(--border-strong); background: white; color: var(--text);
+    transition: all 0.12s; font-family: var(--font);
+  }
+  .btn:hover { background: var(--surface-2); }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+  .btn-primary { background: var(--accent); color: white; border-color: var(--accent-dark); }
+  .btn-primary:hover { background: var(--accent-dark); }
+  .btn-success { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
+  .btn-success:hover { background: #a7f3d0; }
+  #status-msg { flex: 1; font-size: 12px; color: var(--text-3); font-style: italic; }
+
+  /* ─── Info strips ─── */
+  .info-strip {
+    padding: 10px 14px; background: var(--surface-3); border: 1px solid var(--indigo-border);
+    border-radius: 8px; font-size: 12.5px; color: var(--indigo-text); line-height: 1.6;
+  }
+  .info-strip strong { font-weight: 600; }
+  .warn-strip {
+    padding: 12px 16px; background: #fffbeb; border: 1px solid var(--amber-border);
+    border-radius: 8px; font-size: 12.5px; color: var(--amber-text); line-height: 1.6;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .warn-strip-icon { font-size: 16px; flex-shrink: 0; }
+
+  /* ─── History panel ─── */
+  #history-panel {
+    position: fixed; right: 0; top: 0; bottom: 0; width: 380px;
+    background: white; border-left: 1px solid var(--border); z-index: 500;
+    display: flex; flex-direction: column; transform: translateX(100%); transition: transform 0.25s;
+  }
+  #history-panel.open { transform: translateX(0); }
+  #history-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  #history-header h3 { font-size: 14px; font-weight: 600; }
+  #history-content { flex: 1; overflow-y: auto; padding: 16px; font-size: 12px; color: var(--text-2); line-height: 1.7; }
+  .history-entry { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+  .history-stage-tag { font-size: 10px; font-weight: 700; color: var(--accent); text-transform: uppercase; margin-bottom: 4px; }
+  .history-field { margin-top: 6px; }
+  .history-label { font-size: 10px; font-weight: 600; color: var(--text-3); }
+  .history-value { font-size: 12px; color: var(--text); }
+
+  /* ─── Toast ─── */
+  #toast {
+    position: fixed; bottom: 20px; right: 20px; background: var(--sidebar-bg);
+    color: #e0e7ff; padding: 10px 18px; border-radius: 8px; font-size: 13px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25); opacity: 0; transform: translateY(8px);
+    transition: all 0.2s; pointer-events: none; z-index: 1000;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+
+  /* ─── AI Assistant panel ─── */
+  #ai-assist-panel {
+    position: fixed; bottom: 0; left: var(--sidebar-width); right: 0;
+    height: 420px; background: white; border-top: 2px solid var(--accent);
+    box-shadow: 0 -8px 32px rgba(99,102,241,0.12);
+    display: flex; flex-direction: column; z-index: 400;
+    transform: translateY(100%); transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+  }
+  #ai-assist-panel.open { transform: translateY(0); }
+  #main { transition: padding-bottom 0.28s cubic-bezier(0.4,0,0.2,1); }
+  body.assist-open #main { padding-bottom: 420px; }
+  #ai-assist-header {
+    display: flex; align-items: center; gap: 0;
+    border-bottom: 1px solid var(--border); flex-shrink: 0; background: var(--surface-2);
+  }
+  #ai-assist-title {
+    font-size: 12px; font-weight: 600; color: var(--text-2);
+    padding: 0 16px; white-space: nowrap;
+    border-right: 1px solid var(--border);
+    height: 44px; display: flex; align-items: center; gap: 7px;
+  }
+  .assist-tab-bar { display: flex; flex: 1; overflow-x: auto; }
+  .assist-tab {
+    display: flex; align-items: center; gap: 7px;
+    padding: 0 18px; height: 44px; font-size: 12.5px; font-weight: 500;
+    cursor: pointer; border-right: 1px solid var(--border);
+    color: var(--text-3); white-space: nowrap; transition: all 0.15s;
+    border-bottom: 2px solid transparent; flex-shrink: 0;
+  }
+  .assist-tab:hover { background: white; color: var(--text-2); }
+  .assist-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: white; }
+  .assist-tab-icon { width: 18px; height: 18px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+  #ai-assist-close {
+    margin-left: auto; padding: 0 14px; height: 44px; border: none; background: none;
+    color: var(--text-3); font-size: 16px; cursor: pointer; flex-shrink: 0;
+    border-left: 1px solid var(--border); transition: color 0.1s;
+  }
+  #ai-assist-close:hover { color: var(--text); }
+  #ai-assist-body { flex: 1; display: flex; overflow: hidden; }
+
+  /* service panes */
+  .assist-pane { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+  .assist-pane.active { display: flex; }
+
+  /* blocked-site view (shown when iframe fails) */
+  .assist-blocked {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 14px; padding: 24px; text-align: center;
+  }
+  .assist-blocked-icon { font-size: 36px; }
+  .assist-blocked h4 { font-size: 14px; font-weight: 600; color: var(--text); }
+  .assist-blocked p { font-size: 12.5px; color: var(--text-3); line-height: 1.6; max-width: 380px; }
+  .assist-open-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 20px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    cursor: pointer; border: 1px solid var(--border-strong);
+    background: white; color: var(--text); text-decoration: none; transition: all 0.12s;
+  }
+  .assist-open-btn:hover { background: var(--surface-2); }
+  .assist-open-btn.primary { background: var(--accent); color: white; border-color: var(--accent-dark); }
+  .assist-open-btn.primary:hover { background: var(--accent-dark); }
+
+  /* scratchpad pane */
+  #assist-scratchpad-pane { display: none; flex: 1; flex-direction: column; }
+  #assist-scratchpad-pane.active { display: flex; }
+  #assist-scratchpad-header {
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    font-size: 11.5px; color: var(--text-3); background: var(--surface-2);
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+  }
+  #assist-scratchpad {
+    flex: 1; border: none; outline: none; resize: none;
+    font-family: var(--font); font-size: 13px; color: var(--text);
+    padding: 14px 16px; line-height: 1.7; background: white;
+  }
+  #assist-scratchpad::placeholder { color: var(--text-3); }
+  #assist-copy-notice {
+    font-size: 11px; color: var(--success); opacity: 0; transition: opacity 0.3s;
+  }
+  #assist-copy-notice.show { opacity: 1; }
+
+  .btn-assist {
+    background: #ede9fe; color: #4c1d95; border-color: #c4b5fd;
+  }
+  .btn-assist:hover { background: #ddd6fe; }
+</style>
+</head>
+<body>
+
+<!-- ─── Setup Overlay ─── -->
+<div id="setup-overlay">
+  <div id="setup-box">
+    <div id="setup-box-header">
+      <h2>⚙️ Pipeline Setup</h2>
+      <p>Configure how the AI generation steps run. Choose local Ollama models or a cloud API. You can return here any time via the sidebar.</p>
+    </div>
+    <div id="setup-tabs">
+      <div class="setup-tab active" onclick="switchSetupTab('local')">🖥 Local (Ollama)</div>
+      <div class="setup-tab" onclick="switchSetupTab('cloud')">☁️ Cloud (Anthropic API)</div>
+    </div>
+
+    <!-- Local tab -->
+    <div class="setup-pane active" id="tab-local">
+      <div class="setup-section">
+        <h3>Step 1 — Open this file correctly</h3>
+        <p>Browsers block <code>localhost</code> calls from a <code>file://</code> page (CORS). You need to serve the HTML from a local server. Open your terminal, <code>cd</code> to the folder containing this file, and run:</p>
+        <div class="cmd-block">python3 -m http.server 8080</div>
+        <p style="margin-top:10px;">Then open <code style="background:#e8e6f8;color:#312e81;padding:1px 5px;border-radius:4px;">http://localhost:8080/pipeline_author.html</code> in your browser. Keep this terminal running while you use the app.</p>
+        <p style="margin-top:8px;font-size:11.5px;color:var(--text-3);">Python is pre-installed on macOS and most Linux distros. On Windows, install from <strong>python.org</strong> then use the same command in PowerShell.</p>
+      </div>
+      <div class="setup-section">
+        <h3>Step 2 — Start Ollama with CORS enabled</h3>
+        <p>Ollama must be told to accept requests from your local server. Start it like this instead of the plain <code>ollama serve</code>:</p>
+        <div class="cmd-block"># macOS / Linux
+OLLAMA_ORIGINS="*" ollama serve</div>
+        <div class="cmd-block" style="margin-top:8px;"># macOS — if Ollama runs as a menu bar app, run this first then restart it
+launchctl setenv OLLAMA_ORIGINS "*"</div>
+        <div class="cmd-block" style="margin-top:8px;"># Windows (PowerShell)
+$env:OLLAMA_ORIGINS="*"; ollama serve</div>
+      </div>
+      <div class="setup-section">
+        <h3>Step 3 — Pull the recommended models</h3>
+        <p>These cover all pipeline stages. Pull them once; they stay cached locally (~6 GB each for the 7b models).</p>
+        <div class="cmd-block">ollama pull deepseek-r1:7b
+ollama pull qwen2.5-coder:7b
+ollama pull gemma3:4b
+ollama pull qwen3:4b
+ollama pull llama3:8b
+ollama pull phi3:mini</div>
+      </div>
+      <div class="setup-section">
+        <h3>Step 4 — Configure &amp; test</h3>
+        <p>Default URL is <code>http://localhost:11434</code>. Only change this if Ollama is on a different port or machine.</p>
+        <label class="setup-label" style="margin-top:10px;">Ollama API base URL</label>
+        <input class="setup-input" id="ollama-url" type="text" value="http://localhost:11434" placeholder="http://localhost:11434" />
+        <div style="display:flex;gap:10px;align-items:center;margin-top:12px;">
+          <button class="btn btn-primary" onclick="testOllama()" style="font-size:12px;padding:7px 14px;">Test Ollama connection</button>
+          <span id="ollama-test-result" style="font-size:12px;color:var(--text-3);">Not tested yet</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cloud tab -->
+    <div class="setup-pane" id="tab-cloud">
+      <div class="setup-section">
+        <h3>Opening the app</h3>
+        <p>Cloud mode calls <code>api.anthropic.com</code> directly, so <strong>you can just open this HTML file by double-clicking it</strong> — no local server needed. Your browser won't block those requests.</p>
+        <p style="margin-top:8px;font-size:11.5px;color:var(--text-3);">If you prefer to serve it anyway (e.g. you also use Ollama), run <code>python3 -m http.server 8080</code> in the file's folder and open <code>http://localhost:8080/pipeline_author.html</code>.</p>
+      </div>
+      <div class="setup-section">
+        <h3>Anthropic API key</h3>
+        <p>Get your key from <strong>console.anthropic.com</strong>. It's stored only in memory for this session — never saved to disk.</p>
+        <label class="setup-label" style="margin-top:12px;">API Key</label>
+        <div class="setup-row">
+          <input class="setup-input" id="api-key-input" type="password" placeholder="sk-ant-api03-..." autocomplete="off" />
+          <button class="btn" onclick="toggleKeyVisibility()" style="font-size:12px;padding:7px 12px;">👁</button>
+        </div>
+      </div>
+      <div class="setup-section">
+        <h3>Cloud model</h3>
+        <p>This model is used for all AI generation steps when cloud mode is active. Per-stage model overrides still apply.</p>
+        <label class="setup-label" style="margin-top:10px;">Model</label>
+        <select class="setup-input" id="cloud-model-select" style="font-family:var(--mono);">
+          <option value="claude-sonnet-4-6">claude-sonnet-4-6 (recommended)</option>
+          <option value="claude-opus-4-6">claude-opus-4-6 (most capable)</option>
+          <option value="claude-haiku-4-5-20251001">claude-haiku-4-5 (fastest)</option>
+        </select>
+      </div>
+      <div class="setup-section">
+        <h3>Test connection</h3>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:4px;">
+          <button class="btn btn-primary" onclick="testCloudAPI()" style="font-size:12px;padding:7px 14px;">Test API Key</button>
+          <span id="cloud-test-result" style="font-size:12px;color:var(--text-3);">Not tested yet</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-footer">
+      <span class="setup-status" id="setup-footer-status"></span>
+      <button class="btn" onclick="closeSetup()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSetup()">Save & Start Pipeline →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Model Picker Modal ─── -->
+<div id="model-modal" class="hidden">
+  <div id="model-box">
+    <div id="model-box-header">
+      <h3>Edit models for this stage</h3>
+      <button class="btn" onclick="closeModelModal()" style="font-size:12px;padding:5px 10px;">✕</button>
+    </div>
+    <div id="model-box-body">
+      <p style="font-size:12.5px;color:var(--text-3);margin-bottom:16px;line-height:1.6;">
+        Set the primary and optional secondary model for this stage. Use Ollama model names (e.g. <code style="font-family:var(--mono);font-size:11px;background:#eef2ff;color:#312e81;padding:1px 5px;border-radius:3px;">deepseek-r1:7b</code>) or cloud model strings.
+      </p>
+      <div class="model-slot">
+        <div class="model-slot-label">Primary model</div>
+        <div class="model-slot-row">
+          <input class="model-slot-input" id="model-primary" type="text" placeholder="e.g. deepseek-r1:7b" />
+        </div>
+        <div class="model-presets" id="primary-presets"></div>
+      </div>
+      <div class="model-slot" style="margin-top:16px;">
+        <div class="model-slot-label">Secondary model <span style="font-weight:400;color:var(--text-3);">(optional)</span></div>
+        <div class="model-slot-row">
+          <input class="model-slot-input" id="model-secondary" type="text" placeholder="e.g. gemma3:4b" />
+        </div>
+        <div class="model-presets" id="secondary-presets"></div>
+      </div>
+    </div>
+    <div id="model-box-footer">
+      <button class="btn" onclick="closeModelModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveModelOverride()">Apply to this stage</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Sidebar ─── -->
+<nav id="sidebar">
+  <div id="sidebar-header">
+    <h1>Pipeline Author</h1>
+    <p>LLM-Assisted Software Dev</p>
+  </div>
+  <div id="stage-list"></div>
+  <div id="sidebar-footer">
+    <button id="setup-reopen-btn" onclick="openSetup()">⚙️ Connection Setup</button>
+    <div id="sf-progress-text" style="margin-bottom:6px;font-size:11px;color:#6d6a9c;">Progress: 0 of 9 stages done</div>
+    <div style="height:3px;background:rgba(99,102,241,0.15);border-radius:2px;">
+      <div id="sf-progress-bar" style="height:100%;border-radius:2px;background:#6366f1;width:0%;transition:width 0.4s;"></div>
+    </div>
+  </div>
+</nav>
+
+<!-- ─── Main ─── -->
+<div id="main">
+  <div id="progress-bar-wrap"><div id="progress-bar" style="width:0%"></div></div>
+  <div id="topbar">
+    <div id="topbar-stage-badge">Stage 1</div>
+    <h2 id="topbar-title">Product Requirements Document (PRD)</h2>
+    <div id="topbar-models" onclick="openModelModal()" title="Click to change models for this stage">
+      <span id="topbar-models-text">deepseek-r1:7b · gemma3:4b</span>
+      <span class="edit-icon">✏️</span>
+    </div>
+    <button class="btn" onclick="toggleHistory()">📋 History</button>
+  </div>
+  <div id="content"></div>
+  <div id="bottombar">
+    <span id="status-msg">Fill in the product introduction, then your manual inputs.</span>
+    <button class="btn btn-assist" onclick="toggleAssist()">💬 AI Assistant</button>
+    <button class="btn" id="btn-prev" onclick="goStage(currentStage-1)" disabled>← Previous</button>
+    <button class="btn btn-primary" id="btn-action" onclick="handleMainAction()">Generate AI Output →</button>
+    <button class="btn btn-success" id="btn-next" onclick="goStage(currentStage+1)" disabled>Next Stage →</button>
+  </div>
+</div>
+
+<!-- ─── AI Assistant Panel ─── -->
+<div id="ai-assist-panel">
+  <div id="ai-assist-header">
+    <div id="ai-assist-title">💬 AI Assistant</div>
+    <div class="assist-tab-bar">
+      <div class="assist-tab active" onclick="switchAssistTab('chatgpt')">
+        <div class="assist-tab-icon" style="background:#10a37f;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M22.28 9.28a5.996 5.996 0 00-.52-4.93 6.07 6.07 0 00-6.53-2.92A5.99 5.99 0 009.87 0a6.07 6.07 0 00-5.79 4.2 5.995 5.995 0 00-4 2.9 6.07 6.07 0 00.75 7.12 5.99 5.99 0 00.52 4.93 6.07 6.07 0 006.53 2.92A5.99 5.99 0 0014.13 24a6.07 6.07 0 005.8-4.21 5.99 5.99 0 003.99-2.9 6.07 6.07 0 00-.64-7.6v.09z"/></svg>
+        </div>
+        ChatGPT
+      </div>
+      <div class="assist-tab" onclick="switchAssistTab('claude')">
+        <div class="assist-tab-icon" style="background:#d97757;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M13.83 8.44L12 3.28 10.17 8.44H5.08l4.2 3.05-1.6 4.93L12 13.35l4.32 3.07-1.6-4.93 4.2-3.05z"/></svg>
+        </div>
+        Claude
+      </div>
+      <div class="assist-tab" onclick="switchAssistTab('gemini')">
+        <div class="assist-tab-icon" style="background:#4285f4;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+        </div>
+        Gemini
+      </div>
+      <div class="assist-tab" onclick="switchAssistTab('perplexity')">
+        <div class="assist-tab-icon" style="background:#20b2aa;">
+          <span style="color:white;font-size:10px;font-weight:700;">P</span>
+        </div>
+        Perplexity
+      </div>
+      <div class="assist-tab" onclick="switchAssistTab('scratchpad')">
+        <div class="assist-tab-icon" style="background:#6366f1;">
+          <span style="color:white;font-size:10px;">📝</span>
+        </div>
+        Notes
+      </div>
+    </div>
+    <button id="ai-assist-close" onclick="toggleAssist()" title="Close assistant">✕</button>
+  </div>
+
+  <div id="ai-assist-body">
+
+    <!-- ChatGPT -->
+    <div class="assist-pane active" id="assist-pane-chatgpt">
+      <div class="assist-blocked">
+        <div class="assist-blocked-icon">🤖</div>
+        <h4>ChatGPT</h4>
+        <p>ChatGPT blocks embedding in iframes. Open it in a new tab, ask your question, copy the answer, then paste it into your Notes tab here to keep it handy.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+          <a class="assist-open-btn primary" href="https://chatgpt.com" target="_blank" rel="noopener">Open ChatGPT ↗</a>
+          <button class="assist-open-btn" onclick="switchAssistTab('scratchpad')">📝 Open Notes tab</button>
+        </div>
+        <div style="margin-top:18px;padding:12px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;width:100%;max-width:480px;">
+          <div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em;">Suggested prompt template</div>
+          <div id="chatgpt-prompt-box" style="font-family:var(--mono);font-size:12px;color:var(--text-2);line-height:1.7;white-space:pre-wrap;" id="chatgpt-suggest"></div>
+          <button onclick="copyPrompt('chatgpt-prompt-box')" style="margin-top:8px;font-size:11px;padding:4px 12px;" class="assist-open-btn">Copy prompt</button>
+          <span id="copy-notice-chatgpt" style="font-size:11px;color:var(--success);margin-left:8px;opacity:0;transition:opacity 0.3s;">Copied!</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Claude -->
+    <div class="assist-pane" id="assist-pane-claude">
+      <div class="assist-blocked">
+        <div class="assist-blocked-icon" style="font-size:32px;">◆</div>
+        <h4>Claude (claude.ai)</h4>
+        <p>Claude.ai blocks embedding in iframes. Open it in a new tab — if you're already logged in to claude.ai in your browser you'll land straight in a chat.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+          <a class="assist-open-btn primary" href="https://claude.ai/new" target="_blank" rel="noopener">Open Claude ↗</a>
+          <button class="assist-open-btn" onclick="switchAssistTab('scratchpad')">📝 Open Notes tab</button>
+        </div>
+        <div style="margin-top:18px;padding:12px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;width:100%;max-width:480px;">
+          <div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em;">Suggested prompt template</div>
+          <div id="claude-prompt-box" style="font-family:var(--mono);font-size:12px;color:var(--text-2);line-height:1.7;white-space:pre-wrap;"></div>
+          <button onclick="copyPrompt('claude-prompt-box')" style="margin-top:8px;font-size:11px;padding:4px 12px;" class="assist-open-btn">Copy prompt</button>
+          <span id="copy-notice-claude" style="font-size:11px;color:var(--success);margin-left:8px;opacity:0;transition:opacity 0.3s;">Copied!</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gemini -->
+    <div class="assist-pane" id="assist-pane-gemini">
+      <div class="assist-blocked">
+        <div class="assist-blocked-icon">✦</div>
+        <h4>Google Gemini</h4>
+        <p>Gemini blocks iframe embedding. Open it in a new tab — great for research-heavy questions where web grounding helps.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+          <a class="assist-open-btn primary" href="https://gemini.google.com" target="_blank" rel="noopener">Open Gemini ↗</a>
+          <button class="assist-open-btn" onclick="switchAssistTab('scratchpad')">📝 Open Notes tab</button>
+        </div>
+        <div style="margin-top:18px;padding:12px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;width:100%;max-width:480px;">
+          <div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em;">Suggested prompt template</div>
+          <div id="gemini-prompt-box" style="font-family:var(--mono);font-size:12px;color:var(--text-2);line-height:1.7;white-space:pre-wrap;"></div>
+          <button onclick="copyPrompt('gemini-prompt-box')" style="margin-top:8px;font-size:11px;padding:4px 12px;" class="assist-open-btn">Copy prompt</button>
+          <span id="copy-notice-gemini" style="font-size:11px;color:var(--success);margin-left:8px;opacity:0;transition:opacity 0.3s;">Copied!</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Perplexity -->
+    <div class="assist-pane" id="assist-pane-perplexity">
+      <div class="assist-blocked">
+        <div class="assist-blocked-icon">🔍</div>
+        <h4>Perplexity</h4>
+        <p>Best for quick research and definitions — it cites sources so you can verify technical terms or competitive landscape info before adding it to requirements.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+          <a class="assist-open-btn primary" href="https://perplexity.ai" target="_blank" rel="noopener">Open Perplexity ↗</a>
+          <button class="assist-open-btn" onclick="switchAssistTab('scratchpad')">📝 Open Notes tab</button>
+        </div>
+        <div style="margin-top:18px;padding:12px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;width:100%;max-width:480px;">
+          <div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em;">Suggested prompt template</div>
+          <div id="perplexity-prompt-box" style="font-family:var(--mono);font-size:12px;color:var(--text-2);line-height:1.7;white-space:pre-wrap;"></div>
+          <button onclick="copyPrompt('perplexity-prompt-box')" style="margin-top:8px;font-size:11px;padding:4px 12px;" class="assist-open-btn">Copy prompt</button>
+          <span id="copy-notice-perplexity" style="font-size:11px;color:var(--success);margin-left:8px;opacity:0;transition:opacity 0.3s;">Copied!</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scratchpad / Notes -->
+    <div class="assist-pane" id="assist-pane-scratchpad">
+      <div id="assist-scratchpad-header">
+        <span>Paste AI answers here, jot notes, draft wording — your private scratchpad while you fill in this stage.</span>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span id="assist-copy-notice">Copied!</span>
+          <button class="assist-open-btn" style="font-size:11px;padding:4px 12px;" onclick="copyAllNotes()">Copy all</button>
+          <button class="assist-open-btn" style="font-size:11px;padding:4px 12px;" onclick="clearNotes()">Clear</button>
+        </div>
+      </div>
+      <textarea id="assist-scratchpad" placeholder="Paste answers from ChatGPT / Claude / Gemini here…&#10;&#10;Or jot down ideas, terminology you looked up, wording you want to use in your requirements — anything you need to reference while authoring this stage."></textarea>
+    </div>
+
+  </div><!-- /ai-assist-body -->
+</div><!-- /ai-assist-panel -->
+
+<!-- ─── History panel ─── -->
+<div id="history-panel">
+  <div id="history-header">
+    <h3>Session History</h3>
+    <button class="btn" onclick="toggleHistory()">✕</button>
+  </div>
+  <div id="history-content"><p style="color:var(--text-3);font-size:12px;">No history yet.</p></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─── Global config ───
+const CONFIG = {
+  mode: 'cloud', // 'local' | 'cloud'
+  ollamaUrl: 'http://localhost:11434',
+  apiKey: '',
+  cloudModel: 'claude-sonnet-4-6'
+};
+
+const LOCAL_PRESETS = ['deepseek-r1:7b','qwen2.5-coder:7b','gemma3:4b','qwen3:4b','llama3:8b','phi3:mini'];
+const CLOUD_PRESETS = ['claude-sonnet-4-6','claude-opus-4-6','claude-haiku-4-5-20251001'];
+
+// ─── Pipeline definition ───
+const PIPELINE = [
+  {
+    id: 1, name: "Product Requirements Document (PRD)", type: "Manual+LLM",
+    models: ["deepseek-r1:7b", "gemma3:4b"], isGate: false,
+    note: "Gemma3:4b is excellent for structuring. DeepSeek-R1 excels at reasoning over ambiguity.",
+    hasPrdIntro: true,
+    manualDeliverables: [
+      { id: "d1", label: "D1 — List of functions / systems", badge: "manual", placeholder: "List each major function or system the product will have.\nE.g.\n- User authentication\n- Dashboard\n- API integrations\n- Notification system" },
+      { id: "d2", label: "D2 — Generic description of each function", badge: "manual", placeholder: "Write a brief description of each function listed above. What does it do? Who uses it?" },
+      { id: "d3", label: "D3 — External product/system linkages", badge: "manual", placeholder: "List any external systems this product integrates with: third-party APIs, databases, auth providers, payment gateways..." }
+    ],
+    aiDeliverables: [
+      { id: "ai1", label: "D4 — C4 Context Diagram (text representation)" },
+      { id: "ai2", label: "D5 — Open questions, assumptions & ambiguities" }
+    ],
+    reviewType: "questions"
+  },
+  {
+    id: 2, name: "System Requirements Specification (SRS / FRS)", type: "Manual+LLM",
+    models: ["qwen2.5-coder:7b", "gemma3:4b"], isGate: false,
+    note: "State machines and flowcharts are well within Qwen2.5-Coder capability. Validate invariants manually — LLMs miss negative constraints.",
+    manualDeliverables: [
+      { id: "d1", label: "D1 — Detailed requirements: Frontend, Android, BFF, Backend", badge: "manual", placeholder: "Write structured requirements for each layer:\nFrontend: ...\nAndroid: ...\nBFF: ...\nBackend: ..." }
+    ],
+    aiDeliverables: [
+      { id: "ai1", label: "D2 — High-level state machines" },
+      { id: "ai2", label: "D3 — Flowcharts of functions" },
+      { id: "ai3", label: "D4 — C4 Container Diagram" },
+      { id: "ai4", label: "D5 — System invariants document" }
+    ],
+    reviewType: "questions"
+  },
+  {
+    id: 3, name: "Requirements Validation Gate", type: "Gate",
+    models: ["deepseek-r1:7b", "qwen2.5-coder:7b"], isGate: true,
+    note: "DeepSeek-R1:7b is the right model here — strongest reasoning. Concurrency/offline review is the hardest; expect manual iteration.",
+    manualDeliverables: [
+      { id: "d1", label: "D1 — Contradiction review findings", badge: "manual", placeholder: "Document any contradictions found between requirements..." },
+      { id: "d2", label: "D2 — Ambiguity review findings", badge: "manual", placeholder: "List any ambiguous requirements that need clarification." },
+      { id: "d3", label: "D3 — Missing requirements review", badge: "manual", placeholder: "What's missing? Edge cases, error handling, performance specs not yet defined..." },
+      { id: "d4", label: "D4 — Concurrency & offline-risk review", badge: "manual", placeholder: "Document concurrency issues, race conditions, and offline sync risks identified." }
+    ],
+    aiDeliverables: [{ id: "ai1", label: "D5 — Approved finalized requirements document" }],
+    reviewType: "gate-review",
+    gateReviews: [
+      { id: "r1", question: "Are all functional requirements complete and unambiguous?" },
+      { id: "r2", question: "Have all contradictions been resolved between PRD and SRS?" },
+      { id: "r3", question: "Are concurrency and offline risks documented and mitigated?" },
+      { id: "r4", question: "Are all external system linkages accounted for in requirements?" },
+      { id: "r5", question: "Is the requirements document ready to drive architecture decisions?" }
+    ]
+  },
+  {
+    id: 4, name: "Software Requirements Document (Architecture + Contracts)", type: "LLM+Manual",
+    models: ["qwen2.5-coder:7b"], isGate: false,
+    note: "OpenAPI YAML generation is reliable with Qwen2.5-Coder. PlantUML stencils need manual review. Define a strict YAML template to constrain output.",
+    manualDeliverables: [],
+    aiDeliverables: [
+      { id: "ai1", label: "D1 — Data schema of functions" },
+      { id: "ai2", label: "D2 — UML diagrams of functions" },
+      { id: "ai3", label: "D3 — OpenAPI YAML files" },
+      { id: "ai4", label: "D4 — PlantUML screen stencils" },
+      { id: "ai5", label: "D5 — C4 Component Diagram" }
+    ],
+    reviewType: "questions"
+  },
+  {
+    id: 5, name: "Security & Architecture Validation Gate", type: "Gate",
+    models: ["deepseek-r1:7b"], isGate: true,
+    note: "R1:7b handles multi-step security reasoning well. Offline sync edge cases need explicit scenario prompts.",
+    manualDeliverables: [],
+    aiDeliverables: [
+      { id: "ai1", label: "D1 — Security review" },
+      { id: "ai2", label: "D2 — Offline sync / race-condition review" },
+      { id: "ai3", label: "D3 — Architecture consistency review" },
+      { id: "ai4", label: "D4 — Dependency validation review" }
+    ],
+    reviewType: "gate-review",
+    gateReviews: [
+      { id: "r1", question: "Are all security risks identified and mitigated in the architecture?" },
+      { id: "r2", question: "Are offline sync and race conditions handled in the design?" },
+      { id: "r3", question: "Is the architecture internally consistent across all components?" },
+      { id: "r4", question: "Are all dependencies validated and accounted for?" },
+      { id: "r5", question: "Is the architecture ready to freeze and proceed to task generation?" }
+    ]
+  },
+  {
+    id: 6, name: "SDD + Atomic Task Generation", type: "LLM+Manual",
+    models: ["qwen2.5-coder:7b", "qwen3:4b"], isGate: false,
+    note: "HARDEST STAGE. Context packet schema must be defined before LLM runs. Target ≤3k tokens per context packet.",
+    manualDeliverables: [
+      { id: "d1", label: "D3 — Folder structure & repository layout", badge: "manual", placeholder: "Define the repository structure. E.g.:\n/src\n  /routes\n  /models\n  /services\n/tests\n/docs" }
+    ],
+    aiDeliverables: [
+      { id: "ai1", label: "D1 — Atomic task list (1:1 to implementation)" },
+      { id: "ai2", label: "D2 — Deployment / configuration manual" },
+      { id: "ai3", label: "D4 — Dev & curl-based verification document" },
+      { id: "ai4", label: "D5 — Dependency graph JSON + context packets" }
+    ],
+    reviewType: "questions"
+  },
+  {
+    id: 7, name: "Task Validation Gate", type: "Gate",
+    models: ["qwen3:4b"], isGate: true,
+    note: "Max task size = 1 file + 1 function. Flag any task whose packet + generated code would exceed 6k tokens for Qwen2.5-Coder:7b.",
+    manualDeliverables: [],
+    aiDeliverables: [
+      { id: "ai1", label: "D1 — Oversized task detection" },
+      { id: "ai2", label: "D2 — Hidden dependency review" },
+      { id: "ai3", label: "D3 — Task ambiguity review" },
+      { id: "ai4", label: "D4 — Context-window suitability review" }
+    ],
+    reviewType: "gate-review",
+    gateReviews: [
+      { id: "r1", question: "Are all tasks atomic (max 1 file + 1 function each)?" },
+      { id: "r2", question: "Are hidden dependencies between tasks identified and ordered?" },
+      { id: "r3", question: "Are all tasks unambiguous and implementation-ready?" },
+      { id: "r4", question: "Do all context packets fit within the 6k token budget?" },
+      { id: "r5", question: "Is the approved task graph ready for code generation?" }
+    ]
+  },
+  {
+    id: 8, name: "Local Task-by-Task Code Generation", type: "LLM+Manual",
+    models: ["qwen2.5-coder:7b", "llama3:8b", "deepseek-r1:7b"], isGate: false,
+    note: "Run one task at a time. Feed context packet + prior implementation notes into each prompt. DeepSeek-R1 for review catches logic errors Qwen misses.",
+    manualDeliverables: [
+      { id: "d1", label: "D4 — Implementation notes", badge: "manual", placeholder: "Add any implementation notes, decisions made, architectural choices for this task batch..." }
+    ],
+    aiDeliverables: [
+      { id: "ai1", label: "D1 — Generated code" },
+      { id: "ai2", label: "D2 — Unit tests" },
+      { id: "ai3", label: "D3 — Updated DTOs / interfaces" },
+      { id: "ai4", label: "D5 — Code review findings" }
+    ],
+    reviewType: "questions"
+  },
+  {
+    id: 9, name: "Integration & Deployment Validation", type: "Mixed",
+    models: ["phi3:mini", "qwen3:4b"], isGate: false,
+    note: "Phi3:mini is sufficient for diff-based contract validation. Keep a running mismatch log from Stage 8 to feed into this stage automatically.",
+    manualDeliverables: [
+      { id: "d2", label: "D2 — Contract mismatch review", badge: "manual", placeholder: "Document any contract mismatches found during integration..." },
+      { id: "d3", label: "D3 — Regression verification checklist", badge: "manual", placeholder: "List all regression checks performed and their results..." },
+      { id: "d4", label: "D4 — Deployment readiness review", badge: "manual", placeholder: "Confirm environment, config, secrets, and infrastructure are production-ready..." }
+    ],
+    aiDeliverables: [
+      { id: "ai1", label: "D1 — Integration validation report" },
+      { id: "ai5", label: "D5 — Release approval document" }
+    ],
+    reviewType: "gate-review",
+    gateReviews: [
+      { id: "r1", question: "Do all deployed endpoints match the OpenAPI contracts?" },
+      { id: "r2", question: "Have all regression tests passed?" },
+      { id: "r3", question: "Is the deployment environment correctly configured?" },
+      { id: "r4", question: "Are all contract mismatches resolved or documented?" },
+      { id: "r5", question: "Is the system ready for production release?" }
+    ]
+  }
+];
+
+let currentStage = 1;
+let historyOpen = false;
+
+// Per-stage state
+let stageData = {};
+PIPELINE.forEach(s => {
+  stageData[s.id] = {
+    manualInputs: {},
+    prdIntro: { productName: '', tagline: '', targetUsers: '', problem: '', goals: '' },
+    aiOutputs: {}, qaAnswers: {}, reviewAnswers: {}, reviewNotes: {},
+    aiQuestions: [], completed: false, aiGenerated: false,
+    modelOverride: null // [primary, secondary]
+  };
+});
+
+// ─── Stage model helpers ───
+function getStageModels(stage) {
+  const sd = stageData[stage.id];
+  return sd.modelOverride || stage.models;
+}
+
+function stageModelsLabel(stage) {
+  const m = getStageModels(stage);
+  return m.filter(Boolean).join(' · ');
+}
+
+// ─── Setup overlay ───
+let activeSetupTab = 'local';
+
+function switchSetupTab(tab) {
+  activeSetupTab = tab;
+  document.querySelectorAll('.setup-tab').forEach((el, i) => {
+    el.classList.toggle('active', (i === 0 && tab === 'local') || (i === 1 && tab === 'cloud'));
+  });
+  document.getElementById('tab-local').classList.toggle('active', tab === 'local');
+  document.getElementById('tab-cloud').classList.toggle('active', tab === 'cloud');
+}
+
+function openSetup() {
+  document.getElementById('setup-overlay').classList.remove('hidden');
+  document.getElementById('api-key-input').value = CONFIG.apiKey;
+  document.getElementById('ollama-url').value = CONFIG.ollamaUrl;
+  document.getElementById('cloud-model-select').value = CONFIG.cloudModel;
+  if (CONFIG.mode === 'cloud') switchSetupTab('cloud'); else switchSetupTab('local');
+}
+
+function closeSetup() {
+  document.getElementById('setup-overlay').classList.add('hidden');
+}
+
+function saveSetup() {
+  CONFIG.mode = activeSetupTab;
+  CONFIG.ollamaUrl = document.getElementById('ollama-url').value.trim().replace(/\/$/, '');
+  CONFIG.apiKey = document.getElementById('api-key-input').value.trim();
+  CONFIG.cloudModel = document.getElementById('cloud-model-select').value;
+
+  if (CONFIG.mode === 'cloud' && !CONFIG.apiKey) {
+    document.getElementById('setup-footer-status').textContent = '⚠️ Please enter an API key for cloud mode.';
+    document.getElementById('setup-footer-status').style.color = 'var(--danger)';
+    return;
+  }
+
+  closeSetup();
+  updateSetupIndicator();
+  showToast(CONFIG.mode === 'cloud' ? 'Cloud mode active ☁️' : 'Local Ollama mode active 🖥');
+}
+
+function updateSetupIndicator() {
+  const btn = document.getElementById('setup-reopen-btn');
+  if (CONFIG.mode === 'cloud' && CONFIG.apiKey) {
+    btn.innerHTML = '⚙️ Connection Setup <span style="font-size:9px;background:#d1fae5;color:#065f46;padding:1px 6px;border-radius:8px;margin-left:4px;">Cloud ✓</span>';
+  } else if (CONFIG.mode === 'local') {
+    btn.innerHTML = '⚙️ Connection Setup <span style="font-size:9px;background:#dbeafe;color:#1e40af;padding:1px 6px;border-radius:8px;margin-left:4px;">Local</span>';
+  } else {
+    btn.innerHTML = '⚙️ Connection Setup <span style="font-size:9px;background:#fee2e2;color:#7f1d1d;padding:1px 6px;border-radius:8px;margin-left:4px;">Not set</span>';
+  }
+}
+
+function toggleKeyVisibility() {
+  const inp = document.getElementById('api-key-input');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+async function testOllama() {
+  const url = document.getElementById('ollama-url').value.trim().replace(/\/$/, '');
+  const el = document.getElementById('ollama-test-result');
+  el.textContent = 'Testing…'; el.style.color = 'var(--text-3)';
+  try {
+    const r = await fetch(url + '/api/tags', { signal: AbortSignal.timeout(4000) });
+    if (r.ok) {
+      const d = await r.json();
+      const names = (d.models || []).map(m => m.name).slice(0, 3).join(', ');
+      el.textContent = '✅ Connected — models: ' + (names || 'none pulled yet');
+      el.style.color = 'var(--success)';
+    } else { throw new Error('HTTP ' + r.status); }
+  } catch(e) {
+    el.textContent = '❌ Could not reach Ollama (' + e.message + ')';
+    el.style.color = 'var(--danger)';
+  }
+}
+
+async function testCloudAPI() {
+  const key = document.getElementById('api-key-input').value.trim();
+  const model = document.getElementById('cloud-model-select').value;
+  const el = document.getElementById('cloud-test-result');
+  if (!key) { el.textContent = '⚠️ Enter an API key first'; el.style.color = 'var(--warning)'; return; }
+  el.textContent = 'Testing…'; el.style.color = 'var(--text-3)';
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model, max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
+    });
+    if (r.ok) {
+      el.textContent = '✅ API key valid — ' + model;
+      el.style.color = 'var(--success)';
+    } else {
+      const d = await r.json();
+      el.textContent = '❌ ' + (d.error?.message || 'Invalid key');
+      el.style.color = 'var(--danger)';
+    }
+  } catch(e) {
+    el.textContent = '❌ ' + e.message;
+    el.style.color = 'var(--danger)';
+  }
+}
+
+// ─── Model modal ───
+function openModelModal() {
+  const stage = PIPELINE[currentStage - 1];
+  const models = getStageModels(stage);
+  document.getElementById('model-primary').value = models[0] || '';
+  document.getElementById('model-secondary').value = models[1] || '';
+
+  // Build presets
+  ['primary', 'secondary'].forEach(slot => {
+    const el = document.getElementById(slot + '-presets');
+    el.innerHTML = '';
+    LOCAL_PRESETS.forEach(m => {
+      const b = document.createElement('button');
+      b.className = 'model-preset-btn';
+      b.textContent = m;
+      b.onclick = () => { document.getElementById('model-' + slot).value = m; };
+      el.appendChild(b);
+    });
+    CLOUD_PRESETS.forEach(m => {
+      const b = document.createElement('button');
+      b.className = 'model-preset-btn cloud-preset';
+      b.textContent = m;
+      b.onclick = () => { document.getElementById('model-' + slot).value = m; };
+      el.appendChild(b);
+    });
+  });
+
+  document.getElementById('model-modal').classList.remove('hidden');
+}
+
+function closeModelModal() {
+  document.getElementById('model-modal').classList.add('hidden');
+}
+
+function saveModelOverride() {
+  const primary = document.getElementById('model-primary').value.trim();
+  const secondary = document.getElementById('model-secondary').value.trim();
+  if (!primary) { showToast('Primary model is required'); return; }
+  const sd = stageData[currentStage];
+  sd.modelOverride = [primary, secondary].filter(Boolean);
+  closeModelModal();
+  const label = sd.modelOverride.join(' · ');
+  document.getElementById('topbar-models-text').textContent = label;
+  showToast('Models updated for this stage ✓');
+}
+
+// ─── Sidebar ───
+function buildSidebar() {
+  const list = document.getElementById('stage-list');
+  list.innerHTML = '';
+  PIPELINE.forEach(stage => {
+    const item = document.createElement('div');
+    item.className = 'stage-item'
+      + (stage.isGate ? ' gate' : '')
+      + (stageData[stage.id].completed ? ' completed' : '')
+      + (stage.id === currentStage ? ' active' : '');
+    item.onclick = () => goStage(stage.id);
+    item.innerHTML = `
+      <div class="stage-num">${stage.isGate ? '⛩' : stage.id}</div>
+      <div class="stage-info">
+        <div class="stage-name">${stage.name}</div>
+        <div class="stage-type-tag">${stage.type}${stage.isGate ? ' — GATE' : ''}</div>
+      </div>
+      <div class="stage-status-dot"></div>`;
+    list.appendChild(item);
+  });
+  const done = PIPELINE.filter(s => stageData[s.id].completed).length;
+  const pct = Math.round((done / PIPELINE.length) * 100);
+  document.getElementById('sf-progress-bar').style.width = pct + '%';
+  document.getElementById('sf-progress-text').textContent = `Progress: ${done} of ${PIPELINE.length} stages done`;
+  document.getElementById('progress-bar').style.width = pct + '%';
+}
+
+function goStage(n) {
+  if (n < 1 || n > PIPELINE.length) return;
+  saveCurrentInputs();
+  currentStage = n;
+  buildSidebar();
+  renderStage();
+}
+
+function saveCurrentInputs() {
+  const stage = PIPELINE[currentStage - 1];
+  const sd = stageData[currentStage];
+
+  // PRD intro
+  if (stage.hasPrdIntro) {
+    ['productName','tagline','targetUsers','problem','goals'].forEach(f => {
+      const el = document.getElementById('intro-' + f);
+      if (el) sd.prdIntro[f] = el.value;
+    });
+  }
+
+  stage.manualDeliverables.forEach(d => {
+    const el = document.getElementById('input-' + d.id);
+    if (el) sd.manualInputs[d.id] = el.value;
+  });
+
+  (sd.aiQuestions || []).forEach((q, i) => {
+    const el = document.getElementById('qa-answer-' + i);
+    if (el) sd.qaAnswers[i] = el.value;
+  });
+
+  if (stage.gateReviews) {
+    stage.gateReviews.forEach(r => {
+      const el = document.getElementById('review-notes-' + r.id);
+      if (el) sd.reviewNotes[r.id] = el.value;
+    });
+  }
+}
+
+// ─── Render ───
+function renderStage() {
+  const stage = PIPELINE[currentStage - 1];
+  const sd = stageData[currentStage];
+  const content = document.getElementById('content');
+  content.innerHTML = '';
+
+  document.getElementById('topbar-stage-badge').textContent = 'Stage ' + stage.id;
+  document.getElementById('topbar-stage-badge').className = stage.isGate ? 'gate' : '';
+  document.getElementById('topbar-title').textContent = stage.name;
+  document.getElementById('topbar-models-text').textContent = stageModelsLabel(stage);
+
+  // Config warning if not set up
+  if (!CONFIG.apiKey && CONFIG.mode === 'cloud') {
+    const w = document.createElement('div');
+    w.className = 'warn-strip';
+    w.innerHTML = `<span class="warn-strip-icon">⚠️</span><span>No API key configured. <strong>Click "Connection Setup"</strong> in the sidebar to enter your Anthropic key or configure local Ollama before generating AI outputs.</span>`;
+    content.appendChild(w);
+  }
+
+  // Stage note
+  if (stage.note) {
+    const note = document.createElement('div');
+    note.className = 'info-strip';
+    note.innerHTML = `<strong>ℹ️ Stage note:</strong> ${stage.note}`;
+    content.appendChild(note);
+  }
+
+  // PRD intro section (Stage 1 only)
+  if (stage.hasPrdIntro) {
+    renderPrdIntro(sd, content);
+  }
+
+  // Manual deliverables
+  if (stage.manualDeliverables.length > 0) {
+    const card = document.createElement('div');
+    card.className = 'section-card';
+    card.innerHTML = `
+      <div class="section-header human">
+        <span class="section-icon">✍️</span>
+        Your inputs — manual authoring required
+      </div>
+      <div class="section-body"><div class="deliverables-list" id="manual-deliverables"></div></div>`;
+    content.appendChild(card);
+    const list = card.querySelector('#manual-deliverables');
+    stage.manualDeliverables.forEach(d => {
+      const item = document.createElement('div');
+      item.className = 'deliverable-item';
+      item.innerHTML = `
+        <div class="deliverable-label">
+          ${d.label}
+          <span class="d-badge ${d.badge}">${d.badge === 'manual' ? 'You write this' : 'AI generates'}</span>
+        </div>
+        <textarea class="d-input" id="input-${d.id}" placeholder="${d.placeholder}">${sd.manualInputs[d.id] || ''}</textarea>`;
+      list.appendChild(item);
+    });
+  }
+
+  // AI deliverables
+  if (stage.aiDeliverables.length > 0) {
+    const card = document.createElement('div');
+    card.className = 'section-card';
+    card.innerHTML = `
+      <div class="section-header ai">
+        <span class="section-icon">🤖</span>
+        AI-generated outputs
+        ${!sd.aiGenerated ? '<span style="font-size:10px;font-weight:400;margin-left:auto;opacity:0.7;">Click "Generate AI Output" to populate</span>' : ''}
+      </div>
+      <div class="section-body"><div class="deliverables-list" id="ai-deliverables"></div></div>`;
+    content.appendChild(card);
+    const list = card.querySelector('#ai-deliverables');
+    stage.aiDeliverables.forEach(d => {
+      const item = document.createElement('div');
+      item.className = 'deliverable-item';
+      const out = sd.aiOutputs[d.id];
+      item.innerHTML = `
+        <div class="deliverable-label">${d.label}<span class="d-badge ai-gen">AI generated</span></div>
+        <div class="ai-output-box" id="ai-out-${d.id}">${out || '<span style="opacity:0.5;font-style:italic;">Not yet generated</span>'}</div>`;
+      list.appendChild(item);
+    });
+  }
+
+  // QA section
+  if (sd.aiGenerated && sd.aiQuestions && sd.aiQuestions.length > 0) {
+    renderQASection(stage, sd, content);
+  }
+
+  // Gate review
+  if (stage.gateReviews && sd.aiGenerated) {
+    renderGateReview(stage, sd, content);
+  }
+
+  updateToolbar(stage, sd);
+}
+
+function renderPrdIntro(sd, content) {
+  const card = document.createElement('div');
+  card.className = 'section-card';
+  const intro = sd.prdIntro;
+  card.innerHTML = `
+    <div class="section-header human">
+      <span class="section-icon">📋</span>
+      Product introduction — describe what you're building
+    </div>
+    <div class="section-body">
+      <div class="intro-grid">
+        <div class="intro-field">
+          <label class="intro-label">Product name</label>
+          <input class="intro-input" id="intro-productName" type="text" placeholder="e.g. Fieldflow, PayLedger, Routr…" value="${escHtml(intro.productName)}" />
+        </div>
+        <div class="intro-field">
+          <label class="intro-label">One-line tagline</label>
+          <input class="intro-input" id="intro-tagline" type="text" placeholder="e.g. Real-time field ops management for SMEs" value="${escHtml(intro.tagline)}" />
+        </div>
+        <div class="intro-field full">
+          <label class="intro-label">Target users / audience</label>
+          <input class="intro-input" id="intro-targetUsers" type="text" placeholder="e.g. Operations managers at mid-size logistics companies, 50–500 employees" value="${escHtml(intro.targetUsers)}" />
+        </div>
+        <div class="intro-field full">
+          <label class="intro-label">Problem being solved</label>
+          <textarea class="intro-input" id="intro-problem" placeholder="Describe the core problem your product addresses. What pain point does it eliminate? Who currently suffers from it and how?">${escHtml(intro.problem)}</textarea>
+        </div>
+        <div class="intro-field full">
+          <label class="intro-label">Key goals & success metrics</label>
+          <textarea class="intro-input" id="intro-goals" placeholder="e.g.\n• Reduce manual reporting time by 80%\n• Support 500 concurrent field agents\n• Launch iOS & Android apps within 6 months">${escHtml(intro.goals)}</textarea>
+        </div>
+      </div>
+    </div>`;
+  content.appendChild(card);
+}
+
+function renderQASection(stage, sd, content) {
+  const card = document.createElement('div');
+  card.className = 'section-card';
+  card.innerHTML = `
+    <div class="section-header review">
+      <span class="section-icon">❓</span>
+      AI questions & clarifications — answer to refine outputs
+    </div>
+    <div class="section-body">
+      <p style="font-size:12px;color:var(--text-3);margin-bottom:14px;">The AI raised the following questions. Answer them, then click "Regenerate with Answers" to get refined outputs.</p>
+      <div class="qa-list" id="qa-list"></div>
+    </div>`;
+  content.appendChild(card);
+  const list = card.querySelector('#qa-list');
+  sd.aiQuestions.forEach((q, i) => {
+    const item = document.createElement('div');
+    item.className = 'qa-item';
+    item.innerHTML = `
+      <div class="qa-question"><span class="qa-q-num">Q${i+1}</span><span>${escHtml(q.question)}</span></div>
+      <div>
+        <textarea class="qa-answer" id="qa-answer-${i}" placeholder="Your answer…" rows="2">${escHtml(sd.qaAnswers[i] || '')}</textarea>
+        <div class="qa-link-bar">Links to: <span class="linked-section-tag">${escHtml(q.linkedSection)}</span></div>
+      </div>`;
+    list.appendChild(item);
+  });
+}
+
+function renderGateReview(stage, sd, content) {
+  const card = document.createElement('div');
+  card.className = 'section-card';
+  card.innerHTML = `
+    <div class="section-header ${sd.completed ? 'approved' : 'gate-header'}">
+      <span class="section-icon">${sd.completed ? '✅' : '⛩'}</span>
+      ${sd.completed ? 'Gate approved — proceed to next stage' : 'Gate review — all items must pass to proceed'}
+    </div>
+    <div class="section-body"><div class="review-checklist" id="gate-checklist"></div></div>`;
+  content.appendChild(card);
+  const list = card.querySelector('#gate-checklist');
+  stage.gateReviews.forEach(r => {
+    const item = document.createElement('div');
+    item.className = 'review-item';
+    const ans = sd.reviewAnswers[r.id];
+    item.innerHTML = `
+      <div class="review-question">${r.question}</div>
+      <div class="review-options">
+        <button class="review-opt ${ans === 'yes' ? 'selected-yes' : ''}" onclick="setReview('${r.id}','yes',this)">✅ Yes</button>
+        <button class="review-opt ${ans === 'partial' ? 'selected-partial' : ''}" onclick="setReview('${r.id}','partial',this)">⚠️ Partial</button>
+        <button class="review-opt ${ans === 'no' ? 'selected-no' : ''}" onclick="setReview('${r.id}','no',this)">❌ No</button>
+      </div>
+      <textarea class="review-notes ${(ans==='partial'||ans==='no')?'visible':''}" id="review-notes-${r.id}" placeholder="Notes on what needs fixing…">${escHtml(sd.reviewNotes[r.id] || '')}</textarea>`;
+    list.appendChild(item);
+  });
+}
+
+function setReview(id, val, btn) {
+  const sd = stageData[currentStage];
+  sd.reviewAnswers[id] = val;
+  const parent = btn.closest('.review-item');
+  parent.querySelectorAll('.review-opt').forEach(b => b.classList.remove('selected-yes','selected-partial','selected-no'));
+  btn.classList.add('selected-' + val);
+  const notes = parent.querySelector('.review-notes');
+  notes.classList.toggle('visible', val === 'partial' || val === 'no');
+  checkGateCompletion();
+}
+
+function checkGateCompletion() {
+  const stage = PIPELINE[currentStage - 1];
+  if (!stage.gateReviews) return;
+  const sd = stageData[currentStage];
+  const allAnswered = stage.gateReviews.every(r => sd.reviewAnswers[r.id]);
+  const allPass = stage.gateReviews.every(r => ['yes','partial'].includes(sd.reviewAnswers[r.id]));
+  if (allAnswered && allPass) {
+    sd.completed = true;
+    buildSidebar();
+    document.getElementById('btn-next').disabled = false;
+    showToast('Gate review complete — stage approved ✅');
+    document.getElementById('status-msg').textContent = 'Gate approved. Proceed to next stage.';
+  }
+  updateToolbar(stage, sd);
+}
+
+function updateToolbar(stage, sd) {
+  const btnAction = document.getElementById('btn-action');
+  const btnNext = document.getElementById('btn-next');
+  const statusMsg = document.getElementById('status-msg');
+  document.getElementById('btn-prev').disabled = currentStage <= 1;
+
+  if (!sd.aiGenerated) {
+    btnAction.textContent = 'Generate AI Output →';
+    btnAction.className = 'btn btn-primary';
+    btnAction.disabled = false;
+    btnNext.disabled = true;
+    statusMsg.textContent = 'Fill in your inputs, then click Generate AI Output.';
+  } else if (sd.aiQuestions && sd.aiQuestions.length > 0 && !stage.gateReviews) {
+    btnAction.textContent = '↻ Regenerate with Answers';
+    btnAction.className = 'btn btn-primary';
+    btnAction.disabled = false;
+    const unanswered = sd.aiQuestions.filter((q, i) => !sd.qaAnswers[i]).length;
+    btnNext.disabled = unanswered > 0;
+    statusMsg.textContent = unanswered > 0 ? `${unanswered} question(s) still need answers.` : 'All answered — proceed or regenerate.';
+  } else if (stage.gateReviews) {
+    const allAnswered = stage.gateReviews.every(r => sd.reviewAnswers[r.id]);
+    const allPass = allAnswered && stage.gateReviews.every(r => ['yes','partial'].includes(sd.reviewAnswers[r.id]));
+    btnAction.textContent = '↻ Regenerate AI Output';
+    btnAction.className = 'btn';
+    btnNext.disabled = !allPass;
+    statusMsg.textContent = !allAnswered ? 'Complete the gate review checklist to proceed.'
+      : !allPass ? 'One or more gate items failed — return to fix.'
+      : 'Gate approved — proceed.';
+  } else {
+    btnAction.textContent = '↻ Regenerate';
+    btnAction.className = 'btn';
+    btnNext.disabled = false;
+    statusMsg.textContent = 'AI output generated. Proceed or regenerate.';
+  }
+}
+
+// ─── AI generation ───
+async function handleMainAction() {
+  saveCurrentInputs();
+  const stage = PIPELINE[currentStage - 1];
+  const sd = stageData[currentStage];
+  await generateAIOutput(stage, sd);
+}
+
+async function generateAIOutput(stage, sd) {
+  const btn = document.getElementById('btn-action');
+  btn.disabled = true;
+  btn.textContent = '⏳ Generating…';
+  document.getElementById('status-msg').textContent = 'AI is processing your inputs…';
+
+  stage.aiDeliverables.forEach(d => {
+    const el = document.getElementById('ai-out-' + d.id);
+    if (el) el.innerHTML = '<div class="ai-loading"><div class="spinner"></div>Generating…</div>';
+  });
+
+  // Build context
+  let prdIntroCtx = '';
+  if (stage.hasPrdIntro && sd.prdIntro) {
+    const p = sd.prdIntro;
+    prdIntroCtx = `Product Introduction:
+- Name: ${p.productName || '(not set)'}
+- Tagline: ${p.tagline || '(not set)'}
+- Target users: ${p.targetUsers || '(not set)'}
+- Problem: ${p.problem || '(not set)'}
+- Goals: ${p.goals || '(not set)'}
+
+`;
+  }
+
+  const manualCtx = stage.manualDeliverables.map(d =>
+    `${d.label}:\n${sd.manualInputs[d.id] || '(not filled)'}`
+  ).join('\n\n');
+
+  const qaCtx = (sd.aiQuestions || []).length > 0
+    ? '\n\nClarifications provided:\n' + sd.aiQuestions.map((q, i) =>
+        sd.qaAnswers[i] ? `Q: ${q.question}\nA: ${sd.qaAnswers[i]}` : ''
+      ).filter(Boolean).join('\n\n')
+    : '';
+
+  const models = getStageModels(stage);
+
+  const systemPrompt = `You are an expert software architect helping author a comprehensive software development pipeline. You are on Stage ${stage.id}: "${stage.name}" (type: ${stage.type}).
+
+Stage models: ${models.join(', ')}
+Stage note: ${stage.note}
+
+Return ONLY valid JSON — no markdown, no preamble, no backticks. Exactly this structure:
+{
+  "deliverables": {
+    ${stage.aiDeliverables.map(d => `"${d.id}": "detailed content string"`).join(',\n    ')}
+  },
+  "questions": [
+    { "question": "specific question", "linkedSection": "D1 or deliverable name" }
+  ]
+}
+
+Be specific, technical, and professional. Generate 2–4 targeted questions that identify genuine ambiguities the human author must resolve.`;
+
+  const userPrompt = `Stage ${stage.id}: ${stage.name}
+
+${prdIntroCtx}Manual inputs:
+${manualCtx || '(No manual inputs — generate based on context so far)'}
+${qaCtx}
+
+Generate all AI deliverables for this stage and list open questions.`;
+
+  try {
+    let response;
+
+    if (CONFIG.mode === 'cloud') {
+      response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': CONFIG.apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: CONFIG.cloudModel,
+          max_tokens: 2000,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }]
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error?.message || 'API error');
+      var raw = data.content?.find(b => b.type === 'text')?.text || '';
+    } else {
+      // Ollama
+      response = await fetch(CONFIG.ollamaUrl + '/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: models[0],
+          stream: false,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ]
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Ollama error');
+      var raw = data.message?.content || '';
+    }
+
+    raw = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    // Extract JSON from possible surrounding text
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    let parsed = null;
+    try { parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw); } catch {}
+
+    if (parsed && parsed.deliverables) {
+      stage.aiDeliverables.forEach(d => {
+        sd.aiOutputs[d.id] = parsed.deliverables[d.id] || '(No content for this deliverable — retry)';
+      });
+      sd.aiQuestions = parsed.questions || [];
+    } else {
+      stage.aiDeliverables.forEach(d => {
+        sd.aiOutputs[d.id] = raw.length > 80 ? raw.substring(0, 500) + '\n…[truncated]' : '(Generation failed — retry)';
+      });
+      sd.aiQuestions = [];
+    }
+
+    sd.aiGenerated = true;
+    if (!stage.gateReviews) {
+      sd.completed = sd.aiQuestions.length === 0 || sd.aiQuestions.every((q, i) => sd.qaAnswers[i]);
+    }
+
+    addToHistory(stage, sd);
+    renderStage();
+    showToast('AI output generated ✓');
+
+  } catch (err) {
+    console.error(err);
+    stage.aiDeliverables.forEach(d => {
+      const el = document.getElementById('ai-out-' + d.id);
+      if (el) el.innerHTML = `<span style="color:var(--danger)">Error: ${escHtml(err.message)}. Check setup and retry.</span>`;
+    });
+    document.getElementById('status-msg').textContent = 'Error: ' + err.message;
+    btn.disabled = false;
+    btn.textContent = 'Generate AI Output →';
+  }
+}
+
+function addToHistory(stage, sd) {
+  const historyEl = document.getElementById('history-content');
+  const entry = document.createElement('div');
+  entry.className = 'history-entry';
+  const time = new Date().toLocaleTimeString();
+  const manualCount = Object.values(sd.manualInputs).filter(v => v && v.trim()).length;
+  entry.innerHTML = `
+    <div class="history-stage-tag">Stage ${stage.id} — ${time}</div>
+    <div class="history-field"><span class="history-label">Stage</span><br><span class="history-value">${stage.name}</span></div>
+    <div class="history-field"><span class="history-label">Mode</span><br><span class="history-value">${CONFIG.mode === 'cloud' ? '☁️ Cloud — ' + CONFIG.cloudModel : '🖥 Local — ' + getStageModels(stage)[0]}</span></div>
+    <div class="history-field"><span class="history-label">Manual inputs filled</span><br><span class="history-value">${manualCount}</span></div>
+    <div class="history-field"><span class="history-label">AI deliverables</span><br><span class="history-value">${stage.aiDeliverables.length} generated</span></div>
+    <div class="history-field"><span class="history-label">Questions raised</span><br><span class="history-value">${(sd.aiQuestions || []).length}</span></div>`;
+  if (historyEl.querySelector('p')) historyEl.innerHTML = '';
+  historyEl.prepend(entry);
+}
+
+function toggleHistory() {
+  historyOpen = !historyOpen;
+  document.getElementById('history-panel').classList.toggle('open', historyOpen);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── AI Assistant panel ───
+let assistOpen = false;
+let activeAssistTab = 'chatgpt';
+
+const ASSIST_PROMPTS = {
+  chatgpt: (stage, intro) => `I'm authoring a Product Requirements Document for a software project.
+
+Product: ${intro.productName || '[product name]'}
+Description: ${intro.tagline || '[brief description]'}
+Target users: ${intro.targetUsers || '[target users]'}
+
+I'm currently working on: ${stage.name}
+
+My question: [type your question here]`,
+
+  claude: (stage, intro) => `Context: I'm writing requirements for "${intro.productName || 'my product'}" — ${intro.tagline || '[brief description]'}.
+Currently on stage: ${stage.name}
+
+Please help me with: [type your question here]`,
+
+  gemini: (stage, intro) => `I'm defining software requirements for a product called "${intro.productName || '[product]'}" — ${intro.tagline || '[brief description]'}.
+
+Research question for stage "${stage.name}":
+[type your question here]
+
+Please provide a concise, specific answer I can use directly in my requirements document.`,
+
+  perplexity: (stage, intro) => `Software requirements research: ${intro.productName || '[product]'}
+
+Stage: ${stage.name}
+
+Question: [type your question here]`
+};
+
+function getAssistPrompt(service) {
+  const stage = PIPELINE[currentStage - 1];
+  const intro = stageData[currentStage].prdIntro || {};
+  const fn = ASSIST_PROMPTS[service];
+  return fn ? fn(stage, intro) : '';
+}
+
+function toggleAssist() {
+  assistOpen = !assistOpen;
+  document.getElementById('ai-assist-panel').classList.toggle('open', assistOpen);
+  if (assistOpen) updateAssistPrompts();
+}
+
+function updateAssistPrompts() {
+  ['chatgpt','claude','gemini','perplexity'].forEach(svc => {
+    const el = document.getElementById(svc + '-prompt-box');
+    if (el) el.textContent = getAssistPrompt(svc);
+  });
+}
+
+function switchAssistTab(tab) {
+  activeAssistTab = tab;
+  document.querySelectorAll('.assist-tab').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.assist-pane').forEach(el => el.classList.remove('active'));
+  const tabs = document.querySelectorAll('.assist-tab');
+  const order = ['chatgpt','claude','gemini','perplexity','scratchpad'];
+  const idx = order.indexOf(tab);
+  if (tabs[idx]) tabs[idx].classList.add('active');
+  const pane = document.getElementById('assist-pane-' + tab);
+  if (pane) pane.classList.add('active');
+}
+
+function copyPrompt(boxId) {
+  const el = document.getElementById(boxId);
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent).then(() => {
+    const svc = boxId.replace('-prompt-box','');
+    const notice = document.getElementById('copy-notice-' + svc);
+    if (notice) { notice.style.opacity = 1; setTimeout(() => notice.style.opacity = 0, 2000); }
+  });
+}
+
+function copyAllNotes() {
+  const el = document.getElementById('assist-scratchpad');
+  if (!el || !el.value) return;
+  navigator.clipboard.writeText(el.value).then(() => {
+    const n = document.getElementById('assist-copy-notice');
+    n.classList.add('show'); setTimeout(() => n.classList.remove('show'), 2000);
+  });
+}
+
+function clearNotes() {
+  if (confirm('Clear your notes? This cannot be undone.')) {
+    document.getElementById('assist-scratchpad').value = '';
+  }
+}
+
+// ─── Init ───
+buildSidebar();
+renderStage();
+updateSetupIndicator();
+</script>
+</body>
+</html>
