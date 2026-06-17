@@ -210,7 +210,7 @@ function renderSessionsFallback(lastId) {
 
 // ─── Global config ───
 const CONFIG = {
-  mode: 'cloud', // 'local' | 'cloud' | 'openai' | 'gemini' | 'azure' | 'openai-compat'
+  mode: 'cloud', // 'local' | 'cloud' | 'openai' | 'gemini' | 'azure' | 'groq' | 'cerebras' | 'openrouter'
   ollamaUrl: 'http://localhost:11434',
   apiKey: '',
   cloudModel: 'claude-sonnet-4-6',
@@ -223,10 +223,15 @@ const CONFIG = {
   azureEndpoint: '',
   azureDeployment: 'gpt-4o',
   azureModel: 'gpt-4o',
-  // OpenAI Compatible provider (Siliconflow, Deepseek, Groq, Openrouter, Cerebras, etc.)
-  openaiCompatKey: '',
-  openaiCompatUrl: 'https://api.openai.com/v1',
-  openaiCompatModel: ''
+  // Groq
+  groqKey: '',
+  groqModel: 'llama3-70b-8192',
+  // Cerebras
+  cerebrasKey: '',
+  cerebrasModel: 'llama-3.1-8b',
+  // OpenRouter
+  openrouterKey: '',
+  openrouterModel: 'deepseek/deepseek-chat'
 };
 
 const DATA_VERSION = 2;
@@ -538,7 +543,9 @@ function getProviderLabel() {
     case 'openai': return '🤖 OpenAI';
     case 'gemini': return '✦ Gemini';
     case 'azure': return '🔷 Azure';
-    case 'openai-compat': return '🔗 OpenAI Compatible';
+    case 'groq': return '🟣 Groq';
+    case 'cerebras': return '🟡 Cerebras';
+    case 'openrouter': return '🧡 OpenRouter';
     default: return 'Not set';
   }
 }
@@ -567,9 +574,12 @@ function openSetup() {
   document.getElementById('azure-endpoint-input').value = CONFIG.azureEndpoint;
   document.getElementById('azure-deployment-input').value = CONFIG.azureDeployment;
   document.getElementById('azure-model-select').value = CONFIG.azureModel;
-  document.getElementById('openai-compat-key-input').value = CONFIG.openaiCompatKey;
-  document.getElementById('openai-compat-url').value = CONFIG.openaiCompatUrl;
-  document.getElementById('openai-compat-model').value = CONFIG.openaiCompatModel;
+  document.getElementById('groq-key-input').value = CONFIG.groqKey;
+  document.getElementById('groq-model-select').value = CONFIG.groqModel;
+  document.getElementById('cerebras-key-input').value = CONFIG.cerebrasKey;
+  document.getElementById('cerebras-model-select').value = CONFIG.cerebrasModel;
+  document.getElementById('openrouter-key-input').value = CONFIG.openrouterKey;
+  document.getElementById('openrouter-model-select').value = CONFIG.openrouterModel;
   switchSetupTab(CONFIG.mode === 'local' ? 'local' : CONFIG.mode);
 }
 
@@ -590,9 +600,12 @@ function saveSetup() {
   CONFIG.azureEndpoint = document.getElementById('azure-endpoint-input').value.trim().replace(/\/$/, '');
   CONFIG.azureDeployment = document.getElementById('azure-deployment-input').value.trim();
   CONFIG.azureModel = document.getElementById('azure-model-select').value;
-  CONFIG.openaiCompatKey = document.getElementById('openai-compat-key-input').value.trim();
-  CONFIG.openaiCompatUrl = document.getElementById('openai-compat-url').value.trim().replace(/\/$/, '');
-  CONFIG.openaiCompatModel = document.getElementById('openai-compat-model').value.trim();
+  CONFIG.groqKey = document.getElementById('groq-key-input').value.trim();
+  CONFIG.groqModel = document.getElementById('groq-model-select').value;
+  CONFIG.cerebrasKey = document.getElementById('cerebras-key-input').value.trim();
+  CONFIG.cerebrasModel = document.getElementById('cerebras-model-select').value;
+  CONFIG.openrouterKey = document.getElementById('openrouter-key-input').value.trim();
+  CONFIG.openrouterModel = document.getElementById('openrouter-model-select').value;
 
   // Validation
   if (CONFIG.mode === 'cloud' && !CONFIG.apiKey) {
@@ -612,6 +625,21 @@ function saveSetup() {
   }
   if (CONFIG.mode === 'azure' && (!CONFIG.azureKey || !CONFIG.azureEndpoint || !CONFIG.azureDeployment)) {
     document.getElementById('setup-footer-status').textContent = '⚠️ Please fill in all Azure fields.';
+    document.getElementById('setup-footer-status').style.color = 'var(--danger)';
+    return;
+  }
+  if (CONFIG.mode === 'groq' && !CONFIG.groqKey) {
+    document.getElementById('setup-footer-status').textContent = '⚠️ Please enter a Groq API key.';
+    document.getElementById('setup-footer-status').style.color = 'var(--danger)';
+    return;
+  }
+  if (CONFIG.mode === 'cerebras' && !CONFIG.cerebrasKey) {
+    document.getElementById('setup-footer-status').textContent = '⚠️ Please enter a Cerebras API key.';
+    document.getElementById('setup-footer-status').style.color = 'var(--danger)';
+    return;
+  }
+  if (CONFIG.mode === 'openrouter' && !CONFIG.openrouterKey) {
+    document.getElementById('setup-footer-status').textContent = '⚠️ Please enter an OpenRouter API key.';
     document.getElementById('setup-footer-status').style.color = 'var(--danger)';
     return;
   }
@@ -907,10 +935,22 @@ function renderStage() {
     w.innerHTML = `<span class="warn-strip-icon">⚠️</span><span>Azure not fully configured. <strong>Click "Connection Setup"</strong> in the sidebar.</span>`;
     content.appendChild(w);
   }
-  if ((!CONFIG.openaiCompatKey || !CONFIG.openaiCompatModel) && CONFIG.mode === 'openai-compat') {
+  if (!CONFIG.groqKey && CONFIG.mode === 'groq') {
     const w = document.createElement('div');
     w.className = 'warn-strip';
-    w.innerHTML = `<span class="warn-strip-icon">⚠️</span><span>OpenAI Compatible provider not configured. <strong>Click "Connection Setup"</strong> in the sidebar.</span>`;
+    w.innerHTML = `<span class="warn-strip-icon">⚠️</span><span>No Groq API key configured. <strong>Click "Connection Setup"</strong> in the sidebar.</span>`;
+    content.appendChild(w);
+  }
+  if (!CONFIG.cerebrasKey && CONFIG.mode === 'cerebras') {
+    const w = document.createElement('div');
+    w.className = 'warn-strip';
+    w.innerHTML = `<span class="warn-strip-icon">⚠️</span><span>No Cerebras API key configured. <strong>Click "Connection Setup"</strong> in the sidebar.</span>`;
+    content.appendChild(w);
+  }
+  if (!CONFIG.openrouterKey && CONFIG.mode === 'openrouter') {
+    const w = document.createElement('div');
+    w.className = 'warn-strip';
+    w.innerHTML = `<span class="warn-strip-icon">⚠️</span><span>No OpenRouter API key configured. <strong>Click "Connection Setup"</strong> in the sidebar.</span>`;
     content.appendChild(w);
   }
 
@@ -1232,6 +1272,15 @@ Generate all AI deliverables for this stage and list open questions.`;
       case 'openai-compat':
         raw = await callOpenAICompat(systemPrompt, userPrompt);
         break;
+      case 'groq':
+        raw = await callGroq(systemPrompt, userPrompt);
+        break;
+      case 'cerebras':
+        raw = await callCerebras(systemPrompt, userPrompt);
+        break;
+      case 'openrouter':
+        raw = await callOpenRouter(systemPrompt, userPrompt);
+        break;
       default: // local / Ollama
         raw = await callOllama(systemPrompt, userPrompt, models[0]);
     }
@@ -1393,6 +1442,102 @@ async function callOpenAICompat(system, user) {
   const data = await r.json();
   if (!r.ok) throw new Error(data.error?.message || 'API error: ' + (r.status));
   return data.choices?.[0]?.message?.content || '';
+}
+
+async function callGroq(system, user) {
+  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + CONFIG.groqKey },
+    body: JSON.stringify({
+      model: CONFIG.groqModel,
+      max_tokens: 2000,
+      messages: [{ role: 'system', content: system }, { role: 'user', content: user }]
+    })
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error?.message || 'Groq API error');
+  return data.choices?.[0]?.message?.content || '';
+}
+
+async function callCerebras(system, user) {
+  const r = await fetch('https://api.cerebras.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + CONFIG.cerebrasKey },
+    body: JSON.stringify({
+      model: CONFIG.cerebrasModel,
+      max_tokens: 2000,
+      messages: [{ role: 'system', content: system }, { role: 'user', content: user }]
+    })
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error?.message || 'Cerebras API error');
+  return data.choices?.[0]?.message?.content || '';
+}
+
+async function callOpenRouter(system, user) {
+  const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + CONFIG.openrouterKey },
+    body: JSON.stringify({
+      model: CONFIG.openrouterModel,
+      max_tokens: 2000,
+      messages: [{ role: 'system', content: system }, { role: 'user', content: user }]
+    })
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error?.message || 'OpenRouter API error');
+  return data.choices?.[0]?.message?.content || '';
+}
+
+async function testGroq() {
+  const key = document.getElementById('groq-key-input').value.trim();
+  const model = document.getElementById('groq-model-select').value;
+  const el = document.getElementById('groq-test-result');
+  if (!key) { el.textContent = '⚠️ Enter an API key first'; el.style.color = 'var(--warning)'; return; }
+  el.textContent = 'Testing…'; el.style.color = 'var(--text-3)';
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({ model, max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
+    });
+    if (r.ok) { el.textContent = '✅ Connected — ' + model; el.style.color = 'var(--success)'; }
+    else { const d = await r.json(); el.textContent = '❌ ' + (d.error?.message || 'Connection failed'); el.style.color = 'var(--danger)'; }
+  } catch(e) { el.textContent = '❌ ' + e.message; el.style.color = 'var(--danger)'; }
+}
+
+async function testCerebras() {
+  const key = document.getElementById('cerebras-key-input').value.trim();
+  const model = document.getElementById('cerebras-model-select').value;
+  const el = document.getElementById('cerebras-test-result');
+  if (!key) { el.textContent = '⚠️ Enter an API key first'; el.style.color = 'var(--warning)'; return; }
+  el.textContent = 'Testing…'; el.style.color = 'var(--text-3)';
+  try {
+    const r = await fetch('https://api.cerebras.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({ model, max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
+    });
+    if (r.ok) { el.textContent = '✅ Connected — ' + model; el.style.color = 'var(--success)'; }
+    else { const d = await r.json(); el.textContent = '❌ ' + (d.error?.message || 'Connection failed'); el.style.color = 'var(--danger)'; }
+  } catch(e) { el.textContent = '❌ ' + e.message; el.style.color = 'var(--danger)'; }
+}
+
+async function testOpenRouter() {
+  const key = document.getElementById('openrouter-key-input').value.trim();
+  const model = document.getElementById('openrouter-model-select').value;
+  const el = document.getElementById('openrouter-test-result');
+  if (!key) { el.textContent = '⚠️ Enter an API key first'; el.style.color = 'var(--warning)'; return; }
+  el.textContent = 'Testing…'; el.style.color = 'var(--text-3)';
+  try {
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({ model, max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
+    });
+    if (r.ok) { el.textContent = '✅ Connected — ' + model; el.style.color = 'var(--success)'; }
+    else { const d = await r.json(); el.textContent = '❌ ' + (d.error?.message || 'Connection failed'); el.style.color = 'var(--danger)'; }
+  } catch(e) { el.textContent = '❌ ' + e.message; el.style.color = 'var(--danger)'; }
 }
 
 async function testOpenAICompat() {

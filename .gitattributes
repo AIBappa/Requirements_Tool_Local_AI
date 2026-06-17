@@ -1,0 +1,40 @@
+# Auto detect text files and normalize to LF for Git storage
+* text=auto
+
+# Source code - normalize to LF
+*.js       text eol=lf
+*.html     text eol=lf
+*.css      text eol=lf
+*.py       text eol=lf
+*.json     text eol=lf
+*.md       text eol=lf
+*.yml      text eol=lf
+*.yaml     text eol=lf
+
+# Dockerfile
+Dockerfile text eol=lf
+
+# Config files
+*.cfg      text eol=lf
+*.ini      text eol=lf
+*.conf     text eol=lf
+*.gitattributes text eol=lf
+*.gitignore     text eol=lf
+
+# Binary files - never touch
+*.xlsx     binary
+*.docx     binary
+*.pdf      binary
+*.png      binary
+*.jpg      binary
+*.jpeg     binary
+*.gif      binary
+*.ico      binary
+*.svg      binary
+*.woff     binary
+*.woff2    binary
+*.ttf      binary
+*.eot      binary
+*.zip      binary
+*.tar      binary
+*.gz       binary
