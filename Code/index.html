@@ -500,7 +500,24 @@ ollama pull phi3:mini</div>
 
 <div id="toast"></div>
 
-<script src="pipeline-config.js"></script>
-<script src="app.js"></script>
+<!-- ─── Module scripts (dependency order) ─── -->
+<script src="pipeline-config.js"></script>       <!-- PIPELINE, STAGE1 config, TAG_CODES -->
+<script src="js/pipeline-settings.js"></script>   <!-- CONFIG, helpers, storage, export, setup, theme -->
+<script src="js/pipeline-api.js"></script>         <!-- LLM API callers -->
+<script src="js/pipeline-session.js"></script>     <!-- Session management -->
+<script src="js/pipeline-history.js"></script>     <!-- Tag history engine -->
+<script src="js/pipeline-assist.js"></script>      <!-- AI Assistant panel -->
+<script src="js/pipeline-stage-common.js"></script> <!-- Shared rendering stages 2-9 -->
+<script src="js/pipeline-stage1.js"></script>      <!-- Stage 1 PRD -->
+<script src="js/pipeline-stage2.js"></script>      <!-- Stage 2 (thin placeholder) -->
+<script src="js/pipeline-stage3.js"></script>      <!-- Stage 3 (thin placeholder) -->
+<script src="js/pipeline-stage4.js"></script>      <!-- Stage 4 (thin placeholder) -->
+<script src="js/pipeline-stage5.js"></script>      <!-- Stage 5 (thin placeholder) -->
+<script src="js/pipeline-stage6.js"></script>      <!-- Stage 6 (thin placeholder) -->
+<script src="js/pipeline-stage7.js"></script>      <!-- Stage 7 (thin placeholder) -->
+<script src="js/pipeline-stage8.js"></script>      <!-- Stage 8 (thin placeholder) -->
+<script src="js/pipeline-stage9.js"></script>      <!-- Stage 9 (thin placeholder) -->
+<script src="js/pipeline-sidebar.js"></script>     <!-- Sidebar + navigation -->
+<script src="app.js"></script>                     <!-- Bootstrap (~50 lines) -->
 </body>
 </html>
