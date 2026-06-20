@@ -411,8 +411,7 @@ function renderExternalSection(container) {
     addBtn.onclick = () => {
       sd.externalCounts = sd.externalCounts || { bff: 0, perm: 0, imm: 0 };
       sd.externalCounts[type === 'bff' ? 'bff' : type]++;
-      saveToStorage();
-      renderStage(); // Re-render
+      renderStage(); // Re-render (data stays in memory until Save JSON)
     };
     itemsContainer.appendChild(addBtn);
   });
@@ -504,12 +503,10 @@ function onFunctionCountChange(val) {
   const tag = getManualTag('D1.4.1');
   logTag('section_functions', 'D1.4.1', tag, String(count), 'Function count set to ' + count);
   updateTagBadge('D1.4.1', 'section_functions', String(count));
-  saveToStorage();
 
   const container = document.getElementById('s1-func-instances');
   if (!container) return;
   renderFunctionInstances(count, container);
-  saveToStorage();
 }
 
 function renderFunctionInstances(count, container) {
@@ -574,7 +571,6 @@ function onFunctionScopingChange(idx, option, checked) {
   } else if (!checked) {
     sd.functionScoping[idx] = sd.functionScoping[idx].filter(v => v !== option);
   }
-  saveToStorage();
 }
 
 function onStage1InputChange(id, val) {
@@ -595,7 +591,9 @@ function onYesNoChange(id, val, followUps, el) {
   const tag = getManualTag(id);
   logTag('', id, tag, val, 'Yes/No: ' + val);
   updateTagBadge(id, '', val);
-  saveStage1Inputs();
+  // Hide tag badge for yes/no items — they don't need a manual/auto label
+  const badge = document.getElementById('tag-' + id);
+  if (badge) { badge.textContent = ''; badge.style.display = 'none'; }
 
   const followContainer = document.getElementById('followups-' + id);
   if (followContainer) followContainer.remove();
@@ -619,13 +617,11 @@ function onYesNoChange(id, val, followUps, el) {
       container.appendChild(div);
       const textarea = div.querySelector('textarea');
       if (textarea) {
-        textarea.addEventListener('change', function() { sd.inputs[fu.id] = this.value; saveToStorage(); });
+        textarea.addEventListener('change', function() { sd.inputs[fu.id] = this.value; });
       }
     });
     el.closest('.s1-item').appendChild(container);
   }
-  saveToStorage();
-  saveStage1Inputs();
 }
 
 function onStage1CheckboxChange(id, opt, checked) {

@@ -811,8 +811,15 @@ body.assist-open #main { padding-bottom: 420px; }
   background: var(--indigo-bg);
   color: var(--indigo-text);
   font-weight: 500;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.2);
 }
-.s1-yesno-opt input[type="radio"] { display: none; }
+.s1-yesno-opt input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
 
 /* Checkbox groups */
 .s1-checkbox-group {

@@ -15,7 +15,6 @@ function logTag(sectionId, itemId, tagCode, content, notes) {
     notes: notes || ''
   };
   sd.historyLog.push(entry);
-  saveToStorage();
   return entry;
 }
 
