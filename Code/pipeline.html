@@ -1190,8 +1190,16 @@ function saveCurrentInputs() {
   });
 
   (sd.aiQuestions || []).forEach((q, i) => {
-    const el = document.getElementById('qa-answer-' + i);
-    if (el) sd.qaAnswers[i] = el.value;
+    const answerType = q.answerType || 'text';
+    if (answerType === 'yes-no') {
+      const hiddenEl = document.getElementById('qa-answer-' + i + '-val');
+      if (hiddenEl) sd.qaAnswers[i] = hiddenEl.value;
+      const notesEl = document.getElementById('qa-answer-' + i);
+      if (notesEl) sd.qaAnswers[i + '_notes'] = notesEl.value;
+    } else {
+      const el = document.getElementById('qa-answer-' + i);
+      if (el) sd.qaAnswers[i] = el.value;
+    }
   });
 
   if (stage.gateReviews) {
@@ -1243,6 +1251,7 @@ function renderStage() {
       <div class="section-header human">
         <span class="section-icon">✍️</span>
         Your inputs — manual authoring required
+        <button class="btn" onclick="saveStageQAJSON()" style="margin-left:auto;font-size:11px;padding:4px 10px;" title="Save current answers to JSON">💾 Save JSON</button>
       </div>
       <div class="section-body"><div class="deliverables-list" id="manual-deliverables"></div></div>`;
     content.appendChild(card);
@@ -1340,6 +1349,7 @@ function renderQASection(stage, sd, content) {
     <div class="section-header review">
       <span class="section-icon">❓</span>
       AI questions & clarifications — answer to refine outputs
+      <button class="btn" onclick="saveStageQAJSON()" style="margin-left:auto;font-size:11px;padding:4px 10px;" title="Save current answers to JSON">💾 Save JSON</button>
     </div>
     <div class="section-body">
       <p style="font-size:12px;color:var(--text-3);margin-bottom:14px;">The AI raised the following questions. Answer them, then click "Regenerate with Answers" to get refined outputs.</p>
@@ -1350,10 +1360,34 @@ function renderQASection(stage, sd, content) {
   sd.aiQuestions.forEach((q, i) => {
     const item = document.createElement('div');
     item.className = 'qa-item';
+    const answerType = q.answerType || 'text';
+    const options = q.options || [];
+    let answerHtml = '';
+
+    if (answerType === 'yes-no') {
+      const currentVal = sd.qaAnswers[i] || '';
+      answerHtml = `
+        <div class="review-options" style="margin-top:4px;">
+          <button class="review-opt ${currentVal === 'yes' ? 'selected-yes' : ''}" onclick="setQAAnswer(${i},'yes',this)">✅ Yes</button>
+          <button class="review-opt ${currentVal === 'no' ? 'selected-no' : ''}" onclick="setQAAnswer(${i},'no',this)">❌ No</button>
+        </div>
+        <textarea class="qa-answer" id="qa-answer-${i}" placeholder="Explain your answer…" rows="2" style="display:${currentVal ? 'block' : 'none'};" onchange="saveQAAnswer(${i}, this.value)">${escHtml(sd.qaAnswers[i + '_notes'] || '')}</textarea>
+        <input type="hidden" id="qa-answer-${i}-val" value="${escHtml(currentVal)}" />`;
+    } else if (answerType === 'dropdown' && options.length > 0) {
+      answerHtml = `
+        <select class="qa-answer" id="qa-answer-${i}" onchange="saveQAAnswer(${i}, this.value)" style="width:100%;padding:10px 14px;border:1px solid var(--border-strong);border-radius:0;font-family:var(--font);font-size:13px;background:white;min-height:40px;">
+          <option value="">— Select an option —</option>
+          ${options.map(opt => `<option value="${escHtml(opt)}" ${sd.qaAnswers[i] === opt ? 'selected' : ''}>${escHtml(opt)}</option>`).join('')}
+        </select>`;
+    } else {
+      answerHtml = `
+        <textarea class="qa-answer" id="qa-answer-${i}" placeholder="Your answer…" rows="2" onchange="saveQAAnswer(${i}, this.value)">${escHtml(sd.qaAnswers[i] || '')}</textarea>`;
+    }
+
     item.innerHTML = `
       <div class="qa-question"><span class="qa-q-num">Q${i+1}</span><span>${escHtml(q.question)}</span></div>
       <div>
-        <textarea class="qa-answer" id="qa-answer-${i}" placeholder="Your answer…" rows="2">${escHtml(sd.qaAnswers[i] || '')}</textarea>
+        ${answerHtml}
         <div class="qa-link-bar">Links to: <span class="linked-section-tag">${escHtml(q.linkedSection)}</span></div>
       </div>`;
     list.appendChild(item);
@@ -1506,9 +1540,14 @@ Return ONLY valid JSON — no markdown, no preamble, no backticks. Exactly this 
     ${stage.aiDeliverables.map(d => `"${d.id}": "detailed content string"`).join(',\n    ')}
   },
   "questions": [
-    { "question": "specific question", "linkedSection": "D1 or deliverable name" }
+    { "question": "specific question", "linkedSection": "D1 or deliverable name", "answerType": "text|yes-no|dropdown", "options": ["A","B","C"] }
   ]
 }
+
+For each question, choose the most appropriate answerType:
+- "text" (default) — free-form text answer, no options needed
+- "yes-no" — binary yes/no question, no options needed
+- "dropdown" — when there are 2-4 specific enumerated answers, include the "options" array
 
 Be specific, technical, and professional. Generate 2–4 targeted questions that identify genuine ambiguities the human author must resolve.`;
 
@@ -1633,6 +1672,30 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ─── QA answer helpers ───
+function setQAAnswer(index, value, btn) {
+  const sd = stageData[currentStage];
+  sd.qaAnswers[index] = value;
+  const parent = btn.closest('.review-options');
+  parent.querySelectorAll('.review-opt').forEach(b => b.classList.remove('selected-yes','selected-no'));
+  btn.classList.add(value === 'yes' ? 'selected-yes' : 'selected-no');
+  const textarea = document.getElementById('qa-answer-' + index);
+  if (textarea) {
+    textarea.style.display = 'block';
+  }
+}
+
+function saveQAAnswer(index, value) {
+  const sd = stageData[currentStage];
+  const question = sd.aiQuestions[index];
+  if (question && question.answerType === 'yes-no') {
+    // value here is the notes text, the binary value is in the hidden input
+    sd.qaAnswers[index + '_notes'] = value;
+  } else {
+    sd.qaAnswers[index] = value;
+  }
+}
+
 // ─── AI Assistant panel ───
 let assistOpen = false;
 let activeAssistTab = 'chatgpt';
@@ -1722,6 +1785,58 @@ function clearNotes() {
   if (confirm('Clear your notes? This cannot be undone.')) {
     document.getElementById('assist-scratchpad').value = '';
   }
+}
+
+// ─── Stage QA JSON Save ───
+function saveStageQAJSON() {
+  const stage = PIPELINE[currentStage - 1];
+  const sd = stageData[currentStage];
+  saveCurrentInputs();
+
+  const answers = {};
+
+  // Manual inputs
+  stage.manualDeliverables.forEach(d => {
+    const val = sd.manualInputs[d.id];
+    if (val && val.trim()) {
+      answers[d.id] = { value: val, label: d.label };
+    }
+  });
+
+  // QA answers
+  (sd.aiQuestions || []).forEach((q, i) => {
+    const val = sd.qaAnswers[i];
+    if (val && String(val).trim()) {
+      answers['qa-' + i] = { value: val, question: q.question, linkedSection: q.linkedSection };
+    }
+  });
+
+  // Gate review answers
+  if (stage.gateReviews) {
+    stage.gateReviews.forEach(r => {
+      const val = sd.reviewAnswers[r.id];
+      if (val) {
+        answers['review-' + r.id] = { value: val, question: r.question, notes: sd.reviewNotes[r.id] || '' };
+      }
+    });
+  }
+
+  const data = {
+    stageId: stage.id,
+    stageName: stage.name,
+    savedAt: new Date().toISOString(),
+    answers: answers
+  };
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const name = stage.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+  a.download = `stage-${stage.id}-${name}-answers.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Stage answers saved ✓');
 }
 
 // ─── Init ───
