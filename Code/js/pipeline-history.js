@@ -38,42 +38,48 @@ function formatTag(itemId, tagCode) {
 }
 
 /** Render the history panel content */
-function renderHistoryPanel() {
+async function renderHistoryPanel() {
   const panel = document.getElementById('history-content');
   if (!panel) return;
-  let snapshots = window.__pipelineSnapshots || [];
-  if (snapshots.length === 0) {
-    panel.innerHTML = '<p style="color:var(--text-3);padding:16px;text-align:center;">No saved snapshots yet. Click "Save JSON" to create one.</p>';
-    return;
+  panel.innerHTML = '<p style="color:var(--text-3);padding:16px;text-align:center;">Loading…</p>';
+  try {
+    const res = await fetch('/api/exports');
+    if (!res.ok) throw new Error('Failed to load exports');
+    const exports = await res.json();
+    if (exports.length === 0) {
+      panel.innerHTML = '<p style="color:var(--text-3);padding:16px;text-align:center;">No saved exports yet. Click "Save to Server" to create one.</p>';
+      return;
+    }
+    let html = '';
+    exports.forEach((exp, idx) => {
+      html += `<div class="history-entry" style="border-left: 3px solid var(--accent);">
+        <div class="history-stage-tag" style="display:flex;justify-content:space-between;align-items:center;">
+          <span class="snapshot-filename" onclick="viewRawJSON('${escHtml(exp.fileName)}')" title="Click to view raw JSON" style="cursor:pointer;text-decoration:underline;color:var(--accent-dark);">📦 ${escHtml(exp.fileName)}</span>
+          <span style="font-size:10px;opacity:0.6;">${new Date(exp.timestamp).toLocaleString()}</span>
+        </div>
+        <div class="history-field">
+          <span class="history-label">Size</span>
+          <span class="history-value">${(exp.size / 1024).toFixed(1)} KB</span>
+        </div>
+        <div class="history-field">
+          <span class="history-label">Stages completed</span>
+          <span class="history-value">${exp.stagesCompleted || 0}/9</span>
+        </div>
+        <div class="history-field">
+          <span class="history-label">Total manual inputs</span>
+          <span class="history-value">${exp.totalManualInputs || 0}</span>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:6px;">
+          <button class="btn" style="font-size:11px;padding:4px 10px;" onclick="downloadSnapshot('${escHtml(exp.fileName)}')">⬇ Download</button>
+          <button class="btn" style="font-size:11px;padding:4px 10px;" onclick="restoreSnapshot('${escHtml(exp.fileName)}')">↩ Restore</button>
+          <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="removeSnapshot('${escHtml(exp.fileName)}')">🗑 Remove</button>
+        </div>
+      </div>`;
+    });
+    panel.innerHTML = html;
+  } catch (e) {
+    panel.innerHTML = '<p style="color:var(--text-3);padding:16px;text-align:center;">Failed to load exports.</p>';
   }
-  let html = '';
-  [...snapshots].reverse().forEach((snapshot, idx) => {
-    const realIdx = snapshots.length - 1 - idx;
-    html += `<div class="history-entry" style="border-left: 3px solid var(--accent);">
-      <div class="history-stage-tag" style="display:flex;justify-content:space-between;align-items:center;">
-        <span class="snapshot-filename" onclick="viewRawJSON(${realIdx})" title="Click to view raw JSON" style="cursor:pointer;text-decoration:underline;color:var(--accent-dark);">📦 ${escHtml(snapshot.fileName)}</span>
-        <span style="font-size:10px;opacity:0.6;">${new Date(snapshot.timestamp).toLocaleString()}</span>
-      </div>
-      <div class="history-field">
-        <span class="history-label">Size</span>
-        <span class="history-value">${(snapshot.size / 1024).toFixed(1)} KB</span>
-      </div>
-      <div class="history-field">
-        <span class="history-label">Stages completed</span>
-        <span class="history-value">${snapshot.stagesCompleted || 0}/9</span>
-      </div>
-      <div class="history-field">
-        <span class="history-label">Total manual inputs</span>
-        <span class="history-value">${snapshot.totalManualInputs || 0}</span>
-      </div>
-      <div style="margin-top:8px;display:flex;gap:6px;">
-        <button class="btn" style="font-size:11px;padding:4px 10px;" onclick="downloadSnapshot(${realIdx})">⬇ Download</button>
-        <button class="btn" style="font-size:11px;padding:4px 10px;" onclick="restoreSnapshot(${realIdx})">↩ Restore</button>
-        <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="removeSnapshot(${realIdx})">🗑 Remove</button>
-      </div>
-    </div>`;
-  });
-  panel.innerHTML = html;
 }
 
 function toggleHistory() {
@@ -84,69 +90,71 @@ function toggleHistory() {
   if (historyOpen) renderHistoryPanel();
 }
 
-/** View raw JSON of a snapshot in modal */
-function viewRawJSON(idx) {
-  const snapshots = window.__pipelineSnapshots || [];
-  const snap = snapshots[idx];
-  if (!snap || !snap.rawJson) { showToast('Raw data not available for this snapshot'); return; }
+/** View raw JSON of an export in modal */
+async function viewRawJSON(fileName) {
   const modal = document.getElementById('raw-view-modal');
   const pre = document.getElementById('raw-view-content');
-  if (modal && pre) {
-    pre.textContent = JSON.stringify(snap.rawJson, null, 2);
+  if (!modal || !pre) return;
+  try {
+    const res = await fetch('/api/exports/' + encodeURIComponent(fileName));
+    if (!res.ok) { showToast('Failed to load export'); return; }
+    const data = await res.json();
+    pre.textContent = JSON.stringify(data, null, 2);
     modal.classList.remove('hidden');
+  } catch (e) {
+    showToast('Failed to load export: ' + e.message);
   }
 }
 
-/** Restore a snapshot into active session */
-function restoreSnapshot(idx) {
-  const snapshots = window.__pipelineSnapshots || [];
-  const snap = snapshots[idx];
-  if (!snap || !snap.rawJson) { showToast('Cannot restore: data not available'); return; }
+/** Restore an export into active session */
+async function restoreSnapshot(fileName) {
   if (!confirm('Restore this snapshot? Current unsaved changes will be lost.')) return;
-  const data = snap.rawJson;
-  if (data.stageData) {
-    PIPELINE.forEach(s => {
-      if (data.stageData[s.id]) {
-        Object.keys(data.stageData[s.id]).forEach(k => {
-          if (typeof data.stageData[s.id][k] === 'object' && !Array.isArray(data.stageData[s.id][k]) && data.stageData[s.id][k] !== null) {
-            stageData[s.id][k] = { ...stageData[s.id][k], ...data.stageData[s.id][k] };
-          } else {
-            stageData[s.id][k] = data.stageData[s.id][k];
-          }
-        });
-      }
-    });
-  }
-  if (data.currentStage) currentStage = data.currentStage;
-  if (data.config) Object.assign(CONFIG, data.config);
-  saveToStorage();
-  saveSessionToServer();
-  if (typeof buildSidebar === 'function') buildSidebar();
-  if (typeof renderStage === 'function') renderStage();
-  if (typeof updateSetupIndicator === 'function') updateSetupIndicator();
-  showToast('Snapshot restored ✓');
-}
-
-/** Download a saved snapshot by index */
-function downloadSnapshot(idx) {
-  const snapshots = window.__pipelineSnapshots || [];
-  const snap = snapshots[idx];
-  if (!snap) return;
-  if (snap.rawJson) {
-    downloadJSON(snap.rawJson, snap.fileName);
-  } else {
-    showToast('Use the previously downloaded file: ' + snap.fileName);
+  try {
+    const res = await fetch('/api/exports/' + encodeURIComponent(fileName));
+    if (!res.ok) { showToast('Failed to load export'); return; }
+    const data = await res.json();
+    if (data.stageData) {
+      PIPELINE.forEach(s => {
+        if (data.stageData[s.id]) {
+          Object.keys(data.stageData[s.id]).forEach(k => {
+            if (typeof data.stageData[s.id][k] === 'object' && !Array.isArray(data.stageData[s.id][k]) && data.stageData[s.id][k] !== null) {
+              stageData[s.id][k] = { ...stageData[s.id][k], ...data.stageData[s.id][k] };
+            } else {
+              stageData[s.id][k] = data.stageData[s.id][k];
+            }
+          });
+        }
+      });
+    }
+    if (data.currentStage) currentStage = data.currentStage;
+    if (data.config) Object.assign(CONFIG, data.config);
+    saveToStorage();
+    if (typeof saveSessionToServer === 'function') saveSessionToServer();
+    if (typeof buildSidebar === 'function') buildSidebar();
+    if (typeof renderStage === 'function') renderStage();
+    if (typeof updateSetupIndicator === 'function') updateSetupIndicator();
+    showToast('Snapshot restored ✓');
+  } catch (e) {
+    showToast('Restore failed: ' + e.message);
   }
 }
 
-/** Remove a snapshot from the in-memory list */
-function removeSnapshot(idx) {
-  const snapshots = window.__pipelineSnapshots || [];
-  if (!confirm('Remove this snapshot from history? The downloaded file will still exist.')) return;
-  snapshots.splice(idx, 1);
-  saveToStorage();
-  renderHistoryPanel();
-  showToast('Snapshot removed from history');
+/** Download a saved export by filename */
+function downloadSnapshot(fileName) {
+  window.open('/api/exports/' + encodeURIComponent(fileName), '_blank');
+}
+
+/** Remove an export from server */
+async function removeSnapshot(fileName) {
+  if (!confirm('Remove this export from server? This cannot be undone.')) return;
+  try {
+    const res = await fetch('/api/exports/' + encodeURIComponent(fileName), { method: 'DELETE' });
+    if (!res.ok) throw new Error('Delete failed');
+    renderHistoryPanel();
+    showToast('Export removed');
+  } catch (e) {
+    showToast('Remove failed: ' + e.message);
+  }
 }
 
 function addToHistory(stage, sd) {

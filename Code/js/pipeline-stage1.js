@@ -115,9 +115,6 @@ function renderStage1PRD(content) {
         <h2 style="margin:0;font-size:18px;">📋 Product Requirements Document</h2>
         <p style="margin:4px 0 0;font-size:12px;color:var(--text-3);">Answer all questions to generate D5 Auto-Checks and D4 Context Diagram</p>
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button class="btn" onclick="savePipelineJSON()" title="Save all data to JSON file">💾 Save JSON</button>
-      </div>
     </div>`;
   content.appendChild(header);
 
@@ -718,38 +715,6 @@ function buildStage1JSON() {
   return json;
 }
 
-function savePipelineJSON() {
-  const json = {
-    exportedAt: new Date().toISOString(),
-    stageData: stageData,
-    currentStage: currentStage
-  };
-  if (!window.__pipelineSnapshots) window.__pipelineSnapshots = [];
-  const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  const stagesCompleted = PIPELINE.filter(s => stageData[s.id] && stageData[s.id].completed).length;
-  let totalManual = 0;
-  PIPELINE.forEach(s => {
-    const sd = stageData[s.id];
-    if (sd && sd.inputs) totalManual += Object.values(sd.inputs).filter(v => v && v.toString().trim()).length;
-  });
-  const fileName = `pipeline-snapshot-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.json`;
-  a.download = fileName;
-  a.click();
-  URL.revokeObjectURL(url);
-  window.__pipelineSnapshots.push({
-    timestamp: new Date().toISOString(),
-    fileName: fileName,
-    size: blob.size,
-    stagesCompleted: stagesCompleted,
-    totalManualInputs: totalManual
-  });
-  showToast('Pipeline JSON saved ✓');
-  saveToStorage();
-}
-
 // ─── D5 Auto-Checks ───
 
 async function runD5Checks() {
@@ -758,8 +723,6 @@ async function runD5Checks() {
   if (!btn) return;
   btn.disabled = true;
   btn.textContent = '⏳ Running D5 Checks…';
-
-  savePipelineJSON();
 
   const json = buildStage1JSON();
   const contextStr = JSON.stringify(json, null, 2);

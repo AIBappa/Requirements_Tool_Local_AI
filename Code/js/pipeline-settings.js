@@ -113,7 +113,6 @@ function saveToStorage() {
         azureDeployment: CONFIG.azureDeployment,
         azureModel: CONFIG.azureModel
       },
-      pipelineSnapshots: window.__pipelineSnapshots || []
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch(e) {
@@ -143,7 +142,6 @@ function loadFromStorage() {
     }
     if (data.currentStage) currentStage = data.currentStage;
     if (data.config) Object.assign(CONFIG, data.config);
-    if (data.pipelineSnapshots) window.__pipelineSnapshots = data.pipelineSnapshots;
     return true;
   } catch(e) {
     console.warn('localStorage load failed:', e.message);
@@ -167,13 +165,18 @@ function downloadJSON(data, fileName) {
   URL.revokeObjectURL(url);
 }
 
-function exportPipelineJSON() {
+async function exportPipelineJSON() {
   if (typeof saveCurrentInputs === 'function') saveCurrentInputs();
   const data = {
-    exportedAt: new Date().toISOString(),
     version: DATA_VERSION,
+    sessionId: (typeof currentSessionId !== 'undefined' && currentSessionId) ? currentSessionId : '',
     stageData: stageData,
     currentStage: currentStage,
+    stagesCompleted: PIPELINE.filter(s => stageData[s.id].completed).length,
+    totalManualInputs: PIPELINE.reduce((sum, s) => {
+      const sd = stageData[s.id];
+      return sum + (sd ? Object.values(sd.manualInputs || {}).filter(v => v && v.trim()).length : 0);
+    }, 0),
     config: {
       mode: CONFIG.mode,
       ollamaUrl: CONFIG.ollamaUrl,
@@ -186,26 +189,17 @@ function exportPipelineJSON() {
     }
   };
   const fileName = 'pipeline-' + new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '.json';
-  downloadJSON(data, fileName);
-
-  // Store full snapshot data in history
-  if (!window.__pipelineSnapshots) window.__pipelineSnapshots = [];
-  const completed = PIPELINE.filter(s => stageData[s.id].completed).length;
-  const manualCount = PIPELINE.reduce((sum, s) => {
-    const sd = stageData[s.id];
-    return sum + (sd ? Object.values(sd.manualInputs || {}).filter(v => v && v.trim()).length : 0);
-  }, 0);
-  window.__pipelineSnapshots.push({
-    fileName: fileName,
-    timestamp: new Date().toISOString(),
-    size: JSON.stringify(data).length,
-    stagesCompleted: completed,
-    totalManualInputs: manualCount,
-    rawJson: data
-  });
-  saveToStorage();
-  if (typeof renderHistoryPanel === 'function') renderHistoryPanel();
-  showToast('Pipeline data exported ✓');
+  try {
+    const res = await fetch('/api/exports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileName, data })
+    });
+    if (!res.ok) throw new Error('Server error ' + res.status);
+    showToast('Saved to server ✓');
+  } catch (e) {
+    showToast('Save failed: ' + e.message);
+  }
 }
 
 function importPipelineJSON(file) {

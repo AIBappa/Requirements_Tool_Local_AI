@@ -30,10 +30,12 @@ from urllib.parse import urlparse
 PORT = 8080
 OLLAMA_BASE = "http://localhost:11434"
 SESSIONS_DIR = Path(__file__).parent / "sessions"
+EXPORTS_DIR = Path(__file__).parent / os.environ.get("PIPELINE_EXPORTS_DIR", "saved_exports")
 STATIC_DIR = Path(__file__).parent
 
-# Ensure sessions directory exists
+# Ensure directories exist
 SESSIONS_DIR.mkdir(exist_ok=True)
+EXPORTS_DIR.mkdir(exist_ok=True)
 
 
 # ─── Session helpers ───
@@ -126,6 +128,42 @@ class PipelineHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json(session)
             return
 
+        # ── API: List exports ──
+        if path == "/api/exports":
+            exports = []
+            for f in sorted(EXPORTS_DIR.glob("*.json"), key=os.path.getmtime, reverse=True):
+                try:
+                    data = json.loads(f.read_text(encoding="utf-8"))
+                    exports.append({
+                        "fileName": f.name,
+                        "timestamp": data.get("exportedAt", ""),
+                        "sessionId": data.get("sessionId", ""),
+                        "size": f.stat().st_size,
+                        "stagesCompleted": data.get("stagesCompleted", 0),
+                        "totalManualInputs": data.get("totalManualInputs", 0),
+                    })
+                except (json.JSONDecodeError, OSError):
+                    continue
+            self._send_json(exports)
+            return
+
+        # ── API: Download a specific export ──
+        m = re.match(r"^/api/exports/([^/]+)$", path)
+        if m:
+            filename = m.group(1)
+            filepath = EXPORTS_DIR / filename
+            if not filepath.exists() or not filepath.is_file():
+                self.send_error(404, "Export not found")
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+            self.send_header("Content-Length", str(filepath.stat().st_size))
+            self.end_headers()
+            with open(filepath, "rb") as f:
+                self.wfile.write(f.read())
+            return
+
         # ── Ollama proxy ──
         m = re.match(r"^/api/ollama/(.+)$", path)
         if m:
@@ -147,6 +185,20 @@ class PipelineHandler(http.server.SimpleHTTPRequestHandler):
             data = self._read_body()
             session = create_session(data)
             self._send_json(session, status=201)
+            return
+
+        # ── API: Save export ──
+        if path == "/api/exports":
+            data = self._read_body()
+            filename = data.get("fileName", f"export-{time.strftime('%Y-%m-%dT%H-%M-%S')}.json")
+            filepath = EXPORTS_DIR / filename
+            payload = data.get("data", {})
+            payload["exportedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            try:
+                filepath.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+                self._send_json({"fileName": filename, "saved": True})
+            except OSError as e:
+                self.send_error(500, f"Failed to save export: {e}")
             return
 
         # ── Ollama proxy (chat/completions) ──
@@ -188,6 +240,17 @@ class PipelineHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"deleted": True})
             else:
                 self.send_error(404, "Session not found")
+            return
+
+        # ── API: Delete export ──
+        m = re.match(r"^/api/exports/([^/]+)$", path)
+        if m:
+            filepath = EXPORTS_DIR / m.group(1)
+            if filepath.exists() and filepath.is_file():
+                filepath.unlink()
+                self._send_json({"deleted": True})
+            else:
+                self.send_error(404, "Export not found")
             return
 
         self.send_error(404, "Not found")
@@ -259,6 +322,7 @@ if __name__ == "__main__":
     server = http.server.HTTPServer(("0.0.0.0", PORT), PipelineHandler)
     print(f"🚀 Pipeline Author server running at http://localhost:{PORT}")
     print(f"📁 Sessions stored in: {SESSIONS_DIR}")
+    print(f"📦 Exports stored in: {EXPORTS_DIR}")
     print(f"🔌 Ollama proxy: http://localhost:{PORT}/api/ollama/... → {OLLAMA_BASE}/api/...")
     print()
     print("To expose via Cloudflare Tunnel:")

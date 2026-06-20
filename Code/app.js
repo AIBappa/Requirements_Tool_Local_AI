@@ -38,32 +38,43 @@ initStageData();
 
 // ─── Init ───
 initTheme();
-function autoSaveAndMaybeRestore() {
+async function autoSaveAndMaybeRestore() {
   try { saveToStorage(); } catch(e) {}
   try { if (typeof saveSessionToServer === 'function') saveSessionToServer(); } catch(e) {}
-  // Auto-load most recent snapshot if pipeline view is about to show
-  const snapshots = window.__pipelineSnapshots || [];
-  if (snapshots.length > 0) {
-    const latest = snapshots[snapshots.length - 1];
-    if (latest && latest.rawJson) {
-      const data = latest.rawJson;
-      if (data.stageData) {
-        PIPELINE.forEach(s => {
-          if (data.stageData[s.id]) {
-            Object.keys(data.stageData[s.id]).forEach(k => {
-              if (typeof data.stageData[s.id][k] === 'object' && !Array.isArray(data.stageData[s.id][k]) && data.stageData[s.id][k] !== null) {
-                stageData[s.id][k] = { ...stageData[s.id][k], ...data.stageData[s.id][k] };
-              } else {
-                stageData[s.id][k] = data.stageData[s.id][k];
+  // Auto-load most recent server export if no session is active
+  try {
+    const res = await fetch('/api/exports');
+    if (res.ok) {
+      const exports = await res.json();
+      if (exports.length > 0) {
+        const latest = exports[0];
+        const dataRes = await fetch('/api/exports/' + encodeURIComponent(latest.fileName));
+        if (dataRes.ok) {
+          const data = await dataRes.json();
+          if (data.stageData) {
+            PIPELINE.forEach(s => {
+              if (data.stageData[s.id]) {
+                Object.keys(data.stageData[s.id]).forEach(k => {
+                  if (typeof data.stageData[s.id][k] === 'object' && !Array.isArray(data.stageData[s.id][k]) && data.stageData[s.id][k] !== null) {
+                    stageData[s.id][k] = { ...stageData[s.id][k], ...data.stageData[s.id][k] };
+                  } else {
+                    stageData[s.id][k] = data.stageData[s.id][k];
+                  }
+                });
               }
             });
           }
-        });
+          if (data.currentStage) currentStage = data.currentStage;
+          if (data.config) Object.assign(CONFIG, data.config);
+        }
       }
-      if (data.currentStage) currentStage = data.currentStage;
-      if (data.config) Object.assign(CONFIG, data.config);
     }
-  }
+  } catch(e) {}
+}
+// Show exports folder path in sidebar
+function showExportsPath() {
+  const el = document.getElementById('exports-path');
+  if (el) el.textContent = '📦 Server folder: saved_exports';
 }
 window.addEventListener('beforeunload', function(e) {
   try { saveToStorage(); } catch(err) {}
@@ -91,5 +102,22 @@ if (window.location.protocol !== 'file:') {
   updateSetupIndicator();
   showToast('Session restored from local storage ✓');
 } else {
-  autoSaveAndMaybeRestore();
+  autoSaveAndMaybeRestore().then(() => {
+    const pipelineView = document.getElementById('pipeline-view');
+    const sessionPage = document.getElementById('session-page');
+    const hasData = PIPELINE.some(s => stageData[s.id] && Object.values(stageData[s.id].manualInputs || {}).some(v => v && v.trim()));
+    if (hasData) {
+      if (pipelineView) pipelineView.classList.remove('hidden');
+      if (sessionPage) sessionPage.classList.add('hidden');
+      buildSidebar();
+      renderStage();
+      updateSetupIndicator();
+      showToast('Session restored from server ✓');
+    } else {
+      if (pipelineView) pipelineView.classList.add('hidden');
+      if (sessionPage) sessionPage.classList.remove('hidden');
+      loadSessions();
+    }
+  });
+  showExportsPath();
 }
