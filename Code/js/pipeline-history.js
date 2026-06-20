@@ -51,7 +51,7 @@ function renderHistoryPanel() {
     const realIdx = snapshots.length - 1 - idx;
     html += `<div class="history-entry" style="border-left: 3px solid var(--accent);">
       <div class="history-stage-tag" style="display:flex;justify-content:space-between;align-items:center;">
-        <span>📦 ${escHtml(snapshot.fileName)}</span>
+        <span class="snapshot-filename" onclick="viewRawJSON(${realIdx})" title="Click to view raw JSON" style="cursor:pointer;text-decoration:underline;color:var(--accent-dark);">📦 ${escHtml(snapshot.fileName)}</span>
         <span style="font-size:10px;opacity:0.6;">${new Date(snapshot.timestamp).toLocaleString()}</span>
       </div>
       <div class="history-field">
@@ -68,6 +68,7 @@ function renderHistoryPanel() {
       </div>
       <div style="margin-top:8px;display:flex;gap:6px;">
         <button class="btn" style="font-size:11px;padding:4px 10px;" onclick="downloadSnapshot(${realIdx})">⬇ Download</button>
+        <button class="btn" style="font-size:11px;padding:4px 10px;" onclick="restoreSnapshot(${realIdx})">↩ Restore</button>
         <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="removeSnapshot(${realIdx})">🗑 Remove</button>
       </div>
     </div>`;
@@ -83,13 +84,59 @@ function toggleHistory() {
   if (historyOpen) renderHistoryPanel();
 }
 
+/** View raw JSON of a snapshot in modal */
+function viewRawJSON(idx) {
+  const snapshots = window.__pipelineSnapshots || [];
+  const snap = snapshots[idx];
+  if (!snap || !snap.rawJson) { showToast('Raw data not available for this snapshot'); return; }
+  const modal = document.getElementById('raw-view-modal');
+  const pre = document.getElementById('raw-view-content');
+  if (modal && pre) {
+    pre.textContent = JSON.stringify(snap.rawJson, null, 2);
+    modal.classList.remove('hidden');
+  }
+}
+
+/** Restore a snapshot into active session */
+function restoreSnapshot(idx) {
+  const snapshots = window.__pipelineSnapshots || [];
+  const snap = snapshots[idx];
+  if (!snap || !snap.rawJson) { showToast('Cannot restore: data not available'); return; }
+  if (!confirm('Restore this snapshot? Current unsaved changes will be lost.')) return;
+  const data = snap.rawJson;
+  if (data.stageData) {
+    PIPELINE.forEach(s => {
+      if (data.stageData[s.id]) {
+        Object.keys(data.stageData[s.id]).forEach(k => {
+          if (typeof data.stageData[s.id][k] === 'object' && !Array.isArray(data.stageData[s.id][k]) && data.stageData[s.id][k] !== null) {
+            stageData[s.id][k] = { ...stageData[s.id][k], ...data.stageData[s.id][k] };
+          } else {
+            stageData[s.id][k] = data.stageData[s.id][k];
+          }
+        });
+      }
+    });
+  }
+  if (data.currentStage) currentStage = data.currentStage;
+  if (data.config) Object.assign(CONFIG, data.config);
+  saveToStorage();
+  saveSessionToServer();
+  if (typeof buildSidebar === 'function') buildSidebar();
+  if (typeof renderStage === 'function') renderStage();
+  if (typeof updateSetupIndicator === 'function') updateSetupIndicator();
+  showToast('Snapshot restored ✓');
+}
+
 /** Download a saved snapshot by index */
 function downloadSnapshot(idx) {
   const snapshots = window.__pipelineSnapshots || [];
   const snap = snapshots[idx];
   if (!snap) return;
-  // We don't keep the full JSON blob, so notify user to use the downloaded file
-  showToast('Use the previously downloaded file: ' + snap.fileName);
+  if (snap.rawJson) {
+    downloadJSON(snap.rawJson, snap.fileName);
+  } else {
+    showToast('Use the previously downloaded file: ' + snap.fileName);
+  }
 }
 
 /** Remove a snapshot from the in-memory list */

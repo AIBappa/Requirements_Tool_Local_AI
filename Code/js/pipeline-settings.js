@@ -157,6 +157,16 @@ function clearSavedData() {
 }
 
 // ─── Export / Import ───
+function downloadJSON(data, fileName) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName || 'pipeline-snapshot.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function exportPipelineJSON() {
   if (typeof saveCurrentInputs === 'function') saveCurrentInputs();
   const data = {
@@ -175,13 +185,26 @@ function exportPipelineJSON() {
       azureModel: CONFIG.azureModel
     }
   };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'pipeline-snapshot.json';
-  a.click();
-  URL.revokeObjectURL(url);
+  const fileName = 'pipeline-' + new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '.json';
+  downloadJSON(data, fileName);
+
+  // Store full snapshot data in history
+  if (!window.__pipelineSnapshots) window.__pipelineSnapshots = [];
+  const completed = PIPELINE.filter(s => stageData[s.id].completed).length;
+  const manualCount = PIPELINE.reduce((sum, s) => {
+    const sd = stageData[s.id];
+    return sum + (sd ? Object.values(sd.manualInputs || {}).filter(v => v && v.trim()).length : 0);
+  }, 0);
+  window.__pipelineSnapshots.push({
+    fileName: fileName,
+    timestamp: new Date().toISOString(),
+    size: JSON.stringify(data).length,
+    stagesCompleted: completed,
+    totalManualInputs: manualCount,
+    rawJson: data
+  });
+  saveToStorage();
+  if (typeof renderHistoryPanel === 'function') renderHistoryPanel();
   showToast('Pipeline data exported ✓');
 }
 

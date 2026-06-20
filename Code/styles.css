@@ -412,6 +412,31 @@ textarea.qa-answer {
 [data-theme="dark"] .warn-strip { background: #2a2410; }
 .warn-strip-icon { font-size: 16px; flex-shrink: 0; }
 
+/* ─── Raw JSON View Modal ─── */
+#raw-view-modal {
+  position: fixed; inset: 0; background: rgba(16,12,58,0.8);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 900; backdrop-filter: blur(2px);
+}
+#raw-view-modal.hidden { display: none; }
+#raw-view-box {
+  background: var(--surface); border-radius: 12px; width: 700px; max-width: 95vw;
+  max-height: 85vh; display: flex; flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden;
+}
+#raw-view-header {
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+#raw-view-header h3 { font-size: 14px; font-weight: 600; color: var(--text); }
+#raw-view-body { flex: 1; overflow-y: auto; padding: 16px; }
+#raw-view-content {
+  font-family: var(--mono); font-size: 11.5px; color: var(--text-2);
+  line-height: 1.7; white-space: pre-wrap; word-break: break-word;
+  background: var(--surface-2); padding: 14px; border-radius: 8px;
+  border: 1px solid var(--border); margin: 0;
+}
+
 /* ─── History panel ─── */
 #history-panel {
   position: fixed; right: 0; top: 0; bottom: 0; width: 380px;

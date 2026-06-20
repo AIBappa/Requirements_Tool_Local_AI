@@ -38,6 +38,42 @@ initStageData();
 
 // ─── Init ───
 initTheme();
+function autoSaveAndMaybeRestore() {
+  try { saveToStorage(); } catch(e) {}
+  try { if (typeof saveSessionToServer === 'function') saveSessionToServer(); } catch(e) {}
+  // Auto-load most recent snapshot if pipeline view is about to show
+  const snapshots = window.__pipelineSnapshots || [];
+  if (snapshots.length > 0) {
+    const latest = snapshots[snapshots.length - 1];
+    if (latest && latest.rawJson) {
+      const data = latest.rawJson;
+      if (data.stageData) {
+        PIPELINE.forEach(s => {
+          if (data.stageData[s.id]) {
+            Object.keys(data.stageData[s.id]).forEach(k => {
+              if (typeof data.stageData[s.id][k] === 'object' && !Array.isArray(data.stageData[s.id][k]) && data.stageData[s.id][k] !== null) {
+                stageData[s.id][k] = { ...stageData[s.id][k], ...data.stageData[s.id][k] };
+              } else {
+                stageData[s.id][k] = data.stageData[s.id][k];
+              }
+            });
+          }
+        });
+      }
+      if (data.currentStage) currentStage = data.currentStage;
+      if (data.config) Object.assign(CONFIG, data.config);
+    }
+  }
+}
+window.addEventListener('beforeunload', function(e) {
+  try { saveToStorage(); } catch(err) {}
+  try { if (typeof saveCurrentInputs === 'function') saveCurrentInputs(); } catch(err) {}
+  try { if (typeof saveSessionToServer === 'function') saveSessionToServer(); } catch(err) {}
+  // Show browser's native confirmation dialog
+  e.preventDefault();
+  e.returnValue = '';
+  return '';
+});
 const loaded = loadFromStorage();
 if (window.location.protocol !== 'file:') {
   const sessionPage = document.getElementById('session-page');
@@ -55,9 +91,5 @@ if (window.location.protocol !== 'file:') {
   updateSetupIndicator();
   showToast('Session restored from local storage ✓');
 } else {
-  const sessionPage = document.getElementById('session-page');
-  const pipelineView = document.getElementById('pipeline-view');
-  if (sessionPage) sessionPage.classList.remove('hidden');
-  if (pipelineView) pipelineView.classList.add('hidden');
-  loadSessions();
+  autoSaveAndMaybeRestore();
 }

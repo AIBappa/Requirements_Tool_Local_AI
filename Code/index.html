@@ -500,6 +500,19 @@ ollama pull phi3:mini</div>
 
 <div id="toast"></div>
 
+<!-- ─── Raw JSON View Modal ─── -->
+<div id="raw-view-modal" class="hidden">
+  <div id="raw-view-box">
+    <div id="raw-view-header">
+      <h3>Raw JSON</h3>
+      <button class="btn" onclick="document.getElementById('raw-view-modal').classList.add('hidden')" style="font-size:12px;padding:5px 10px;">✕</button>
+    </div>
+    <div id="raw-view-body">
+      <pre id="raw-view-content"></pre>
+    </div>
+  </div>
+</div>
+
 <!-- ─── Module scripts (dependency order) ─── -->
 <script src="pipeline-config.js"></script>       <!-- PIPELINE, STAGE1 config, TAG_CODES -->
 <script src="js/pipeline-settings.js"></script>   <!-- CONFIG, helpers, storage, export, setup, theme -->
