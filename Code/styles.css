@@ -669,6 +669,8 @@ body.assist-open #main { padding-bottom: 420px; }
 
 .s1-accordion-body {
   padding: 0;
+  max-height: 520px;
+  overflow-y: auto;
 }
 
 .s1-progress-bar-container {

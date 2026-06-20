@@ -504,6 +504,7 @@ function onFunctionCountChange(val) {
   const tag = getManualTag('D1.4.1');
   logTag('section_functions', 'D1.4.1', tag, String(count), 'Function count set to ' + count);
   updateTagBadge('D1.4.1', 'section_functions', String(count));
+  saveToStorage();
 
   const container = document.getElementById('s1-func-instances');
   if (!container) return;
@@ -563,7 +564,6 @@ function onFunctionNameChange(idx, val) {
   const tag = getManualTag('D1.4.2.' + (idx + 1));
   logTag('section_functions', 'D1.4.2.' + (idx + 1), tag, val, 'Function name');
   updateTagBadge('D1.4.2.' + (idx + 1), 'section_functions', val);
-  saveToStorage();
 }
 
 function onFunctionScopingChange(idx, option, checked) {
@@ -583,7 +583,6 @@ function onStage1InputChange(id, val) {
   const tag = getManualTag(id);
   logTag('', id, tag, val, 'Manual input');
   updateTagBadge(id, '', val);
-  saveToStorage();
 }
 
 function onYesNoChange(id, val, followUps, el) {
@@ -596,6 +595,7 @@ function onYesNoChange(id, val, followUps, el) {
   const tag = getManualTag(id);
   logTag('', id, tag, val, 'Yes/No: ' + val);
   updateTagBadge(id, '', val);
+  saveStage1Inputs();
 
   const followContainer = document.getElementById('followups-' + id);
   if (followContainer) followContainer.remove();
@@ -637,7 +637,6 @@ function onStage1CheckboxChange(id, opt, checked) {
     sd.inputs[id] = sd.inputs[id].filter(v => v !== opt);
   }
   logTag('', id, getManualTag(id), sd.inputs[id].join(', '), 'Checkbox toggle');
-  saveToStorage();
 }
 
 function updateTagBadge(itemId, sectionId, val) {
@@ -645,7 +644,7 @@ function updateTagBadge(itemId, sectionId, val) {
   if (!el) return;
   if (val && val.toString().trim()) {
     const tag = getManualTag(itemId);
-    el.textContent = formatTag(itemId, tag);
+    el.textContent = TAG_LABELS[tag] || tag;
     el.style.display = 'inline';
   } else {
     el.textContent = '';
