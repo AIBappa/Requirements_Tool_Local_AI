@@ -1,0 +1,61 @@
+{
+  "D1.1": {
+    "question": "Product name – must be a valid identifier and makes sense for folder creation",
+    "reason": "Ensures folder name is sensible",
+    "type": "text"
+  },
+  "D1.2.1": {
+    "question": "Business purpose of product",
+    "reason": "Clarifies core value proposition",
+    "type": "textarea"
+  },
+  "D1.2.2": {
+    "question": "Explain for a new user what will happen on first click?",
+    "reason": "Describes workflow for new users",
+    "type": "textarea"
+  },
+  "D1.2.3.1": {
+    "question": "Will you have a normal user who only looks at reading data from your product?",
+    "reason": "Determines read-only user type",
+    "type": "checkboxes"
+  },
+  "D1.2.3.2": {
+    "question": "Will you have a normal user who only looks at writing data to your product?",
+    "reason": "Determines write-only user type",
+    "type": "checkboxes"
+  },
+  "D1.2.3.3": {
+    "question": "Will you have a paid/premium user who looks at writing data to your product and seeking paid/premium features?",
+    "reason": "Identifies premium user segment",
+    "type": "checkboxes"
+  },
+  "D1.2.3.4": {
+    "question": "How many different sub-types of paid/premium users will you need?",
+    "reason": "Defines sub‑type segmentation",
+    "type": "number"
+  },
+  "D1.2.3.5": {
+    "question": "Do you need an admin page for colleagues working on your product?",
+    "reason": "Decides admin functionality",
+    "type": "checkboxes"
+  },
+  "D1.2.3.6": {
+    "question": "Do you need a super-admin page for your product?",
+    "reason": "Decides super‑admin functionality",
+    "type": "checkboxes"
+  },
+  "D1.3": {
+    "question": "Do you need files to be stored on Github or only locally?",
+    "reason": "Determines storage location",
+    "type": "checkboxes"
+  },
+  "D1.4.1": {
+    "question": "How many functions? Enter Integer.",
+    "reason": "Counts function slices",
+    "type": "number"
+  },
+  "D1.4: "Name of function 1 – Get a list of names of all the functions",
+    "reason": "Collects function names",
+    "type": "text"
+  }
+}
