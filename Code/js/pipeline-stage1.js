@@ -116,8 +116,7 @@ function renderStage1PRD(content) {
         <p style="margin:4px 0 0;font-size:12px;color:var(--text-3);">Answer all questions to generate D5 Auto-Checks and D4 Context Diagram</p>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button class="btn" onclick="saveStage1JSON()" title="Save all data to JSON file">💾 Save JSON</button>
-        <button class="btn" onclick="toggleHistory()" title="View tag history">📜 History</button>
+        <button class="btn" onclick="savePipelineJSON()" title="Save all data to JSON file">💾 Save JSON</button>
       </div>
     </div>`;
   content.appendChild(header);
@@ -719,19 +718,35 @@ function buildStage1JSON() {
   return json;
 }
 
-function saveStage1JSON() {
-  const json = buildStage1JSON();
-  const sd = stageData[1];
-  sd.savedJsonAt = new Date().toISOString();
+function savePipelineJSON() {
+  const json = {
+    exportedAt: new Date().toISOString(),
+    stageData: stageData,
+    currentStage: currentStage
+  };
+  if (!window.__pipelineSnapshots) window.__pipelineSnapshots = [];
   const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  const name = (sd.inputs['D1.1'] || 'product').replace(/[^a-zA-Z0-9]/g, '_');
-  a.download = `prd-${name}-${new Date().toISOString().slice(0, 10)}.json`;
+  const stagesCompleted = PIPELINE.filter(s => stageData[s.id] && stageData[s.id].completed).length;
+  let totalManual = 0;
+  PIPELINE.forEach(s => {
+    const sd = stageData[s.id];
+    if (sd && sd.inputs) totalManual += Object.values(sd.inputs).filter(v => v && v.toString().trim()).length;
+  });
+  const fileName = `pipeline-snapshot-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.json`;
+  a.download = fileName;
   a.click();
   URL.revokeObjectURL(url);
-  showToast('PRD JSON saved ✓');
+  window.__pipelineSnapshots.push({
+    timestamp: new Date().toISOString(),
+    fileName: fileName,
+    size: blob.size,
+    stagesCompleted: stagesCompleted,
+    totalManualInputs: totalManual
+  });
+  showToast('Pipeline JSON saved ✓');
   saveToStorage();
 }
 
@@ -744,7 +759,7 @@ async function runD5Checks() {
   btn.disabled = true;
   btn.textContent = '⏳ Running D5 Checks…';
 
-  saveStage1JSON();
+  savePipelineJSON();
 
   const json = buildStage1JSON();
   const contextStr = JSON.stringify(json, null, 2);

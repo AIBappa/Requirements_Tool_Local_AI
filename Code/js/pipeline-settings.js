@@ -112,7 +112,8 @@ function saveToStorage() {
         azureEndpoint: CONFIG.azureEndpoint,
         azureDeployment: CONFIG.azureDeployment,
         azureModel: CONFIG.azureModel
-      }
+      },
+      pipelineSnapshots: window.__pipelineSnapshots || []
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch(e) {
@@ -142,6 +143,7 @@ function loadFromStorage() {
     }
     if (data.currentStage) currentStage = data.currentStage;
     if (data.config) Object.assign(CONFIG, data.config);
+    if (data.pipelineSnapshots) window.__pipelineSnapshots = data.pipelineSnapshots;
     return true;
   } catch(e) {
     console.warn('localStorage load failed:', e.message);

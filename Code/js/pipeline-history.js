@@ -39,30 +39,37 @@ function formatTag(itemId, tagCode) {
 
 /** Render the history panel content */
 function renderHistoryPanel() {
-  const sd = stageData[1];
   const panel = document.getElementById('history-content');
   if (!panel) return;
-  if (!sd.historyLog || sd.historyLog.length === 0) {
-    panel.innerHTML = '<p style="color:var(--text-3);padding:16px;text-align:center;">No history yet. Start filling in your PRD to record events.</p>';
+  let snapshots = window.__pipelineSnapshots || [];
+  if (snapshots.length === 0) {
+    panel.innerHTML = '<p style="color:var(--text-3);padding:16px;text-align:center;">No saved snapshots yet. Click "Save JSON" to create one.</p>';
     return;
   }
   let html = '';
-  [...sd.historyLog].reverse().forEach(entry => {
-    const color = TAG_COLORS[entry.tagCode] || '#888';
-    html += `<div class="history-entry" style="border-left: 3px solid ${color};">
-      <div class="history-stage-tag" style="display:flex;justify-content:space-between;">
-        <span>${escHtml(entry.itemId)}</span>
-        <span style="font-size:10px;opacity:0.6;">${new Date(entry.timestamp).toLocaleString()}</span>
+  [...snapshots].reverse().forEach((snapshot, idx) => {
+    const realIdx = snapshots.length - 1 - idx;
+    html += `<div class="history-entry" style="border-left: 3px solid var(--accent);">
+      <div class="history-stage-tag" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>📦 ${escHtml(snapshot.fileName)}</span>
+        <span style="font-size:10px;opacity:0.6;">${new Date(snapshot.timestamp).toLocaleString()}</span>
       </div>
       <div class="history-field">
-        <span class="history-label">Tag</span>
-        <span class="history-value" style="color:${color};font-weight:600;">${formatTag(entry.itemId, entry.tagCode)}</span>
+        <span class="history-label">Size</span>
+        <span class="history-value">${(snapshot.size / 1024).toFixed(1)} KB</span>
       </div>
       <div class="history-field">
-        <span class="history-label">${TAG_LABELS[entry.tagCode] || entry.tagCode}</span>
-        <span class="history-value">${escHtml(entry.content.substring(0, 120))}${entry.content.length > 120 ? '…' : ''}</span>
+        <span class="history-label">Stages completed</span>
+        <span class="history-value">${snapshot.stagesCompleted || 0}/9</span>
       </div>
-      ${entry.notes ? `<div class="history-field"><span class="history-label">Note</span><span class="history-value">${escHtml(entry.notes)}</span></div>` : ''}
+      <div class="history-field">
+        <span class="history-label">Total manual inputs</span>
+        <span class="history-value">${snapshot.totalManualInputs || 0}</span>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:6px;">
+        <button class="btn" style="font-size:11px;padding:4px 10px;" onclick="downloadSnapshot(${realIdx})">⬇ Download</button>
+        <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;" onclick="removeSnapshot(${realIdx})">🗑 Remove</button>
+      </div>
     </div>`;
   });
   panel.innerHTML = html;
@@ -74,6 +81,25 @@ function toggleHistory() {
   const panel = document.getElementById('history-panel');
   if (panel) panel.classList.toggle('open', historyOpen);
   if (historyOpen) renderHistoryPanel();
+}
+
+/** Download a saved snapshot by index */
+function downloadSnapshot(idx) {
+  const snapshots = window.__pipelineSnapshots || [];
+  const snap = snapshots[idx];
+  if (!snap) return;
+  // We don't keep the full JSON blob, so notify user to use the downloaded file
+  showToast('Use the previously downloaded file: ' + snap.fileName);
+}
+
+/** Remove a snapshot from the in-memory list */
+function removeSnapshot(idx) {
+  const snapshots = window.__pipelineSnapshots || [];
+  if (!confirm('Remove this snapshot from history? The downloaded file will still exist.')) return;
+  snapshots.splice(idx, 1);
+  saveToStorage();
+  renderHistoryPanel();
+  showToast('Snapshot removed from history');
 }
 
 function addToHistory(stage, sd) {
