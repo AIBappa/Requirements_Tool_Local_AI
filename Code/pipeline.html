@@ -228,7 +228,7 @@
   #content { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
 
   /* ─── Section cards ─── */
-  .section-card { background: white; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .section-card { background: white; border: 1px solid var(--border); border-radius: 10px; overflow-y: auto; }
   .section-header {
     display: flex; align-items: center; gap: 10px; padding: 12px 16px;
     border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600;
@@ -335,6 +335,17 @@
     background: white; border-top: 1px solid var(--border);
     padding: 12px 24px; display: flex; align-items: center; gap: 12px; flex-shrink: 0;
   }
+  .mode-toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 500; padding: 6px 12px;
+    border-radius: 7px; border: 1px solid var(--border-strong);
+    background: white; color: var(--text-2); cursor: pointer;
+    transition: all 0.12s; font-family: var(--font);
+  }
+  .mode-toggle:hover { background: var(--surface-2); }
+  .mode-toggle.active-view { background: var(--indigo-bg); color: var(--indigo-text); border-color: var(--indigo-border); }
+  .mode-toggle .toggle-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
+  .mode-toggle.active-view .toggle-dot { background: var(--accent); }
   .btn {
     display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
     border-radius: 7px; font-size: 13px; font-weight: 500; cursor: pointer;
@@ -636,6 +647,10 @@ ollama pull phi3:mini</div>
       <span class="edit-icon">✏️</span>
     </div>
     <button class="btn" onclick="toggleHistory()">📋 History</button>
+    <button class="mode-toggle" id="view-mode-btn" onclick="toggleViewMode()" title="Toggle read-only view mode">
+      <span class="toggle-dot"></span>
+      <span id="view-mode-label">👁 View Mode</span>
+    </button>
   </div>
   <div id="content"></div>
   <div id="bottombar">
@@ -966,6 +981,7 @@ const PIPELINE = [
 
 let currentStage = 1;
 let historyOpen = false;
+let viewMode = false;
 
 // Per-stage state
 let stageData = {};
@@ -1296,6 +1312,18 @@ function renderStage() {
   // QA section
   if (sd.aiGenerated && sd.aiQuestions && sd.aiQuestions.length > 0) {
     renderQASection(stage, sd, content);
+  } else if (sd.aiGenerated) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'section-card';
+    placeholder.innerHTML = `
+      <div class="section-header review">
+        <span class="section-icon">❓</span>
+        AI questions & clarifications
+      </div>
+      <div class="section-body">
+        <p style="font-size:13px;color:var(--text-3);text-align:center;padding:16px 0;">No open questions — the AI did not flag any ambiguities for this stage. You can proceed, or click "Regenerate" if you want a second pass.</p>
+      </div>`;
+    content.appendChild(placeholder);
   }
 
   // Gate review
@@ -1304,6 +1332,17 @@ function renderStage() {
   }
 
   updateToolbar(stage, sd);
+
+  // Re-apply view mode to newly rendered elements
+  if (viewMode) {
+    document.querySelectorAll('#content input, #content textarea, #content select').forEach(el => {
+      el.readOnly = true;
+      el.disabled = true;
+      el.style.background = 'var(--surface-2)';
+      el.style.borderColor = 'transparent';
+      el.style.color = 'var(--text-2)';
+    });
+  }
 }
 
 function renderPrdIntro(sd, content) {
@@ -1839,10 +1878,36 @@ function saveStageQAJSON() {
   showToast('Stage answers saved ✓');
 }
 
+// ─── View Mode ───
+function toggleViewMode() {
+  viewMode = !viewMode;
+  const btn = document.getElementById('view-mode-btn');
+  const label = document.getElementById('view-mode-label');
+  btn.classList.toggle('active-view', viewMode);
+  label.textContent = viewMode ? '✏️ Edit Mode' : '👁 View Mode';
+  document.querySelectorAll('#content input, #content textarea, #content select').forEach(el => {
+    el.readOnly = viewMode;
+    el.disabled = viewMode;
+    if (viewMode) {
+      el.style.background = 'var(--surface-2)';
+      el.style.borderColor = 'transparent';
+      el.style.color = 'var(--text-2)';
+    } else {
+      el.style.background = 'white';
+      el.style.borderColor = 'var(--border-strong)';
+      el.style.color = 'var(--text)';
+    }
+  });
+}
+
 // ─── Init ───
 buildSidebar();
 renderStage();
 updateSetupIndicator();
+
+// Apply view mode state on load (default edit)
+document.getElementById('view-mode-btn').classList.remove('active-view');
+document.getElementById('view-mode-label').textContent = '👁 View Mode';
 </script>
 </body>
 </html>
