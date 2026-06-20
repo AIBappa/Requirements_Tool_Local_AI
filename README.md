@@ -30,6 +30,8 @@ A local desktop tool for authoring software requirements using LLMs. Supports lo
    - **Gemini** — Google Gemini models via API key
    - **Azure** — Azure OpenAI via API key and endpoint
 
+   Also note: https://freellm.net/providers/ - this contains list of free LLM providers.
+
 ### Option 2: Access from Phone via Cloudflare Tunnel
 
 1. Run `python server.py` on your laptop (leave it running)
