@@ -288,8 +288,20 @@ ollama pull phi3:mini</div>
   <div id="sidebar-footer">
     <button id="sessions-btn" onclick="goToSessions()">📂 Sessions</button>
     <button id="setup-reopen-btn" onclick="openSetup()">⚙️ Connection Setup</button>
-    <button class="btn" onclick="exportPipelineJSON()" style="width:100%;font-size:10px;padding:6px 8px;margin-bottom:6px;" title="Save pipeline data to server">💾 Save to Server</button>
-    <div id="exports-path" style="font-size:9px;color:#6d6a9c;margin-bottom:8px;word-break:break-all;"></div>
+    <button class="btn" onclick="exportPipelineJSON()" style="width:100%;font-size:10px;padding:6px 8px;margin-bottom:4px;" title="Save pipeline data to server">💾 Save to Server</button>
+    <button id="exports-config-btn" onclick="toggleExportsConfig()" style="width:100%;font-size:10px;padding:4px 8px;margin-bottom:4px;background:transparent;color:#6d6a9c;border:1px dashed #6d6a9c;" title="Configure where exports are saved">⚙️ Export location</button>
+    <div id="exports-path" style="font-size:9px;color:#6d6a9c;margin-bottom:6px;word-break:break-all;"></div>
+    <div id="exports-config-form" class="hidden" style="background:#f0effe;border:1px solid #e2e0f5;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+      <div style="font-size:10px;font-weight:600;color:var(--text-2);margin-bottom:6px;">Export location</div>
+      <input id="exports-dir-input" type="text" style="width:100%;font-size:11px;padding:5px 8px;border:1px solid var(--border-strong);border-radius:5px;font-family:var(--mono);" placeholder="saved_exports" />
+      <div style="font-size:9px;color:var(--text-3);margin-top:6px;line-height:1.5;">
+        • <strong>Relative path</strong> → saved_exports &nbsp;— inside Code/ directory<br/>
+        • <strong>Absolute path</strong> → /home/user/exports &nbsp;— anywhere on server<br/>
+        • <strong>URL</strong> → https://mytunnel.trycloudflare.com &nbsp;— send to remote
+      </div>
+      <button onclick="saveExportsConfig()" style="margin-top:8px;font-size:10px;padding:4px 12px;" class="btn btn-primary">Save</button>
+      <span id="exports-config-status" style="font-size:10px;margin-left:8px;"></span>
+    </div>
     <div id="sf-progress-text" style="margin-bottom:6px;font-size:11px;color:#6d6a9c;">Progress: 0 of 9 stages done</div>
     <div style="height:3px;background:rgba(99,102,241,0.15);border-radius:2px;">
       <div id="sf-progress-bar" style="height:100%;border-radius:2px;background:#6366f1;width:0%;transition:width 0.4s;"></div>

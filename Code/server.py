@@ -30,12 +30,34 @@ from urllib.parse import urlparse
 PORT = 8080
 OLLAMA_BASE = "http://localhost:11434"
 SESSIONS_DIR = Path(__file__).parent / "sessions"
-EXPORTS_DIR = Path(__file__).parent / os.environ.get("PIPELINE_EXPORTS_DIR", "saved_exports")
 STATIC_DIR = Path(__file__).parent
+CONFIG_FILE = SESSIONS_DIR / "config.json"
 
 # Ensure directories exist
 SESSIONS_DIR.mkdir(exist_ok=True)
-EXPORTS_DIR.mkdir(exist_ok=True)
+
+def load_server_config():
+    if CONFIG_FILE.exists():
+        try:
+            return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {"exportsDir": os.environ.get("PIPELINE_EXPORTS_DIR", "saved_exports")}
+
+def resolve_exports_dir(config):
+    raw = config.get("exportsDir", "saved_exports")
+    if not raw:
+        raw = "saved_exports"
+    p = Path(raw)
+    if raw.startswith("http://") or raw.startswith("https://"):
+        return p  # URL, not a filesystem path
+    if p.is_absolute():
+        return p
+    return STATIC_DIR / raw
+
+def reload_exports_dir():
+    global EXPORTS_DIR
+    EXPORTS_DIR = resolve_exports_dir(load_server_config())
 
 
 # ─── Session helpers ───
@@ -128,8 +150,19 @@ class PipelineHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json(session)
             return
 
+        # ── API: Get server config ──
+        if path == "/api/config":
+            cfg = load_server_config()
+            cfg["exportsDirResolved"] = str(EXPORTS_DIR)
+            self._send_json(cfg)
+            return
+
         # ── API: List exports ──
         if path == "/api/exports":
+            exports_dir_str = str(EXPORTS_DIR)
+            if exports_dir_str.startswith("http://") or exports_dir_str.startswith("https://"):
+                self._send_json([])
+                return
             exports = []
             for f in sorted(EXPORTS_DIR.glob("*.json"), key=os.path.getmtime, reverse=True):
                 try:
@@ -147,10 +180,14 @@ class PipelineHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(exports)
             return
 
-        # ── API: Download a specific export ──
+        # ── API: Download / view a specific export ──
         m = re.match(r"^/api/exports/([^/]+)$", path)
         if m:
             filename = m.group(1)
+            exports_dir_str = str(EXPORTS_DIR)
+            if exports_dir_str.startswith("http://") or exports_dir_str.startswith("https://"):
+                self.send_error(501, "Remote URL mode: cannot download from remote storage")
+                return
             filepath = EXPORTS_DIR / filename
             if not filepath.exists() or not filepath.is_file():
                 self.send_error(404, "Export not found")
@@ -190,11 +227,32 @@ class PipelineHandler(http.server.SimpleHTTPRequestHandler):
         # ── API: Save export ──
         if path == "/api/exports":
             data = self._read_body()
-            filename = data.get("fileName", f"export-{time.strftime('%Y-%m-%dT%H-%M-%S')}.json")
-            filepath = EXPORTS_DIR / filename
             payload = data.get("data", {})
             payload["exportedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            exports_dir_str = str(EXPORTS_DIR)
+            if exports_dir_str.startswith("http://") or exports_dir_str.startswith("https://"):
+                # Remote URL mode: POST the export payload to the remote endpoint
+                try:
+                    req = urllib.request.Request(
+                        exports_dir_str + "/" + data.get("fileName", f"export-{time.strftime('%Y-%m-%dT%H-%M-%S')}.json"),
+                        data=json.dumps(payload).encode("utf-8"),
+                        method="POST",
+                        headers={"Content-Type": "application/json"},
+                    )
+                    with urllib.request.urlopen(req, timeout=15) as resp:
+                        self._send_json(json.loads(resp.read()))
+                except urllib.error.HTTPError as e:
+                    self.send_error(502, f"Remote export failed: {e.reason}")
+                except urllib.error.URLError as e:
+                    self.send_error(502, f"Remote export unreachable: {e.reason}")
+                except Exception as e:
+                    self.send_error(500, f"Remote export error: {e}")
+                return
+            # Local filesystem mode
+            filename = data.get("fileName", f"export-{time.strftime('%Y-%m-%dT%H-%M-%S')}.json")
+            filepath = EXPORTS_DIR / filename
             try:
+                EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
                 filepath.write_text(json.dumps(payload, indent=2), encoding="utf-8")
                 self._send_json({"fileName": filename, "saved": True})
             except OSError as e:
@@ -226,6 +284,19 @@ class PipelineHandler(http.server.SimpleHTTPRequestHandler):
             existing["id"] = session_id
             saved = save_session(session_id, existing)
             self._send_json(saved)
+            return
+
+        # ── API: Save server config ──
+        if path == "/api/config":
+            data = self._read_body()
+            exports_dir = data.get("exportsDir", "saved_exports")
+            config_data = {"exportsDir": exports_dir}
+            try:
+                CONFIG_FILE.write_text(json.dumps(config_data, indent=2), encoding="utf-8")
+                reload_exports_dir()
+                self._send_json({"saved": True, "exportsDir": exports_dir, "exportsDirResolved": str(EXPORTS_DIR)})
+            except OSError as e:
+                self.send_error(500, f"Failed to save config: {e}")
             return
 
         self.send_error(404, "Not found")
@@ -317,6 +388,9 @@ class PipelineHandler(http.server.SimpleHTTPRequestHandler):
 
 
 # ─── Entry point ───
+
+server_config = load_server_config()
+EXPORTS_DIR = resolve_exports_dir(server_config)
 
 if __name__ == "__main__":
     server = http.server.HTTPServer(("0.0.0.0", PORT), PipelineHandler)
