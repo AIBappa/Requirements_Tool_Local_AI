@@ -20,7 +20,9 @@ const CONFIG = {
   cerebrasKey: '',
   cerebrasModel: 'llama-3.1-8b',
   openrouterKey: '',
-  openrouterModel: 'deepseek/deepseek-chat'
+  openrouterModel: 'deepseek/deepseek-chat',
+  nvidiaKey: '',
+  nvidiaModel: 'minimaxai/minimax-m3'
 };
 
 const DATA_VERSION = 3;
@@ -70,6 +72,7 @@ function getProviderLabel() {
     case 'groq': return '🟣 Groq';
     case 'cerebras': return '🟡 Cerebras';
     case 'openrouter': return '🧡 OpenRouter';
+    case 'nvidia': return '🟢 NVIDIA NIM';
     default: return 'Not set';
   }
 }
@@ -111,7 +114,8 @@ function saveToStorage() {
         geminiModel: CONFIG.geminiModel,
         azureEndpoint: CONFIG.azureEndpoint,
         azureDeployment: CONFIG.azureDeployment,
-        azureModel: CONFIG.azureModel
+        azureModel: CONFIG.azureModel,
+        nvidiaModel: CONFIG.nvidiaModel
       },
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -185,7 +189,8 @@ async function exportPipelineJSON() {
       geminiModel: CONFIG.geminiModel,
       azureEndpoint: CONFIG.azureEndpoint,
       azureDeployment: CONFIG.azureDeployment,
-      azureModel: CONFIG.azureModel
+      azureModel: CONFIG.azureModel,
+      nvidiaModel: CONFIG.nvidiaModel
     }
   };
   const fileName = 'pipeline-' + new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '.json';
@@ -376,7 +381,9 @@ function openSetup() {
     'cerebras-key-input': CONFIG.cerebrasKey,
     'cerebras-model-select': CONFIG.cerebrasModel,
     'openrouter-key-input': CONFIG.openrouterKey,
-    'openrouter-model-select': CONFIG.openrouterModel
+    'openrouter-model-select': CONFIG.openrouterModel,
+    'nvidia-key-input': CONFIG.nvidiaKey,
+    'nvidia-model-select': CONFIG.nvidiaModel
   };
   Object.keys(map).forEach(id => {
     const el = document.getElementById(id);
@@ -409,6 +416,8 @@ function saveSetup() {
   CONFIG.cerebrasModel = document.getElementById('cerebras-model-select')?.value || CONFIG.cerebrasModel;
   CONFIG.openrouterKey = (document.getElementById('openrouter-key-input')?.value || '').trim();
   CONFIG.openrouterModel = document.getElementById('openrouter-model-select')?.value || CONFIG.openrouterModel;
+  CONFIG.nvidiaKey = (document.getElementById('nvidia-key-input')?.value || '').trim();
+  CONFIG.nvidiaModel = document.getElementById('nvidia-model-select')?.value || CONFIG.nvidiaModel;
 
   const statusEl = document.getElementById('setup-footer-status');
   if (!statusEl) { closeSetup(); updateSetupIndicator(); saveToStorage(); showToast(getProviderLabel() + ' mode active'); return; }
@@ -420,7 +429,8 @@ function saveSetup() {
     azure: { key: null, label: 'all Azure fields' },
     groq: { key: 'groqKey', label: 'a Groq API key' },
     cerebras: { key: 'cerebrasKey', label: 'a Cerebras API key' },
-    openrouter: { key: 'openrouterKey', label: 'an OpenRouter API key' }
+    openrouter: { key: 'openrouterKey', label: 'an OpenRouter API key' },
+    nvidia: { key: 'nvidiaKey', label: 'a NVIDIA NIM API key' }
   };
 
   const check = requiredChecks[CONFIG.mode];
@@ -594,6 +604,24 @@ async function testOpenRouter() {
   el.textContent = 'Testing…'; el.style.color = 'var(--text-3)';
   try {
     const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({ model, max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
+    });
+    if (r.ok) { el.textContent = '✅ Connected — ' + model; el.style.color = 'var(--success)'; }
+    else { const d = await r.json(); el.textContent = '❌ ' + (d.error?.message || 'Connection failed'); el.style.color = 'var(--danger)'; }
+  } catch(e) { el.textContent = '❌ ' + e.message; el.style.color = 'var(--danger)'; }
+}
+
+async function testNvidia() {
+  const key = (document.getElementById('nvidia-key-input')?.value || '').trim();
+  const model = document.getElementById('nvidia-model-select')?.value || CONFIG.nvidiaModel;
+  const el = document.getElementById('nvidia-test-result');
+  if (!el) return;
+  if (!key) { el.textContent = '⚠️ Enter an API key first'; el.style.color = 'var(--warning)'; return; }
+  el.textContent = 'Testing…'; el.style.color = 'var(--text-3)';
+  try {
+    const r = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
       body: JSON.stringify({ model, max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })

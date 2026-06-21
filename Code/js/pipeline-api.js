@@ -129,3 +129,24 @@ async function callOpenRouter(system, user) {
   if (!r.ok) throw new Error(data.error?.message || 'OpenRouter API error');
   return data.choices?.[0]?.message?.content || '';
 }
+
+async function callNvidia(system, user) {
+  const r = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + CONFIG.nvidiaKey
+    },
+    body: JSON.stringify({
+      model: CONFIG.nvidiaModel,
+      max_tokens: 2000,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user }
+      ]
+    })
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error?.message || 'NVIDIA NIM API error');
+  return data.choices?.[0]?.message?.content || '';
+}

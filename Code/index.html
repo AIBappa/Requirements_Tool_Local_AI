@@ -24,6 +24,7 @@
       <div class="setup-tab" data-tab="groq" onclick="switchSetupTab('groq')">🟣 Groq</div>
       <div class="setup-tab" data-tab="cerebras" onclick="switchSetupTab('cerebras')">🟡 Cerebras</div>
       <div class="setup-tab" data-tab="openrouter" onclick="switchSetupTab('openrouter')">🧡 OpenRouter</div>
+      <div class="setup-tab" data-tab="nvidia" onclick="switchSetupTab('nvidia')">🟢 NVIDIA NIM</div>
     </div>
 
     <!-- Local tab -->
@@ -234,6 +235,33 @@ ollama pull phi3:mini</div>
       <div class="setup-section">
         <button class="btn btn-primary" onclick="testOpenRouter()" style="font-size:12px;padding:7px 14px;">Test API Key</button>
         <span id="openrouter-test-result" style="font-size:12px;color:var(--text-3);margin-left:10px;">Not tested yet</span>
+      </div>
+    </div>
+
+    <!-- NVIDIA NIM tab -->
+    <div class="setup-pane" id="tab-nvidia">
+      <div class="setup-section">
+        <h3>NVIDIA NIM API key</h3>
+        <p>Get your API key at <a href="https://build.nvidia.com" target="_blank" rel="noopener">build.nvidia.com</a> — access models like MiniMax-M3, Llama, Gemma, and more via NVIDIA NIM.</p>
+        <label class="setup-label">API Key</label>
+        <div class="setup-row">
+          <input class="setup-input" id="nvidia-key-input" type="password" placeholder="nvapi-..." autocomplete="off" />
+          <button class="btn" onclick="toggleKeyVisibility('nvidia-key-input')" style="font-size:12px;padding:7px 12px;">👁</button>
+        </div>
+      </div>
+      <div class="setup-section">
+        <h3>Model</h3>
+        <select class="setup-input" id="nvidia-model-select" style="font-family:var(--mono);">
+          <option value="minimaxai/minimax-m3">minimaxai/minimax-m3 (recommended)</option>
+          <option value="meta/llama-3.1-70b-instruct">meta/llama-3.1-70b-instruct</option>
+          <option value="meta/llama-3.1-8b-instruct">meta/llama-3.1-8b-instruct</option>
+          <option value="google/gemma-2-9b-it">google/gemma-2-9b-it</option>
+          <option value="deepseek-ai/deepseek-r1">deepseek-ai/deepseek-r1</option>
+        </select>
+      </div>
+      <div class="setup-section">
+        <button class="btn btn-primary" onclick="testNvidia()" style="font-size:12px;padding:7px 14px;">Test API Key</button>
+        <span id="nvidia-test-result" style="font-size:12px;color:var(--text-3);margin-left:10px;">Not tested yet</span>
       </div>
     </div>
 

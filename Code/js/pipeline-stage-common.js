@@ -79,7 +79,8 @@ function renderStage() {
   const setupChecks = [
     { mode: 'cloud', key: 'apiKey' }, { mode: 'openai', key: 'openaiKey' },
     { mode: 'gemini', key: 'geminiKey' }, { mode: 'groq', key: 'groqKey' },
-    { mode: 'cerebras', key: 'cerebrasKey' }, { mode: 'openrouter', key: 'openrouterKey' }
+    { mode: 'cerebras', key: 'cerebrasKey' }, { mode: 'openrouter', key: 'openrouterKey' },
+    { mode: 'nvidia', key: 'nvidiaKey' }
   ];
   for (const sc of setupChecks) {
     if (CONFIG.mode === sc.mode && !CONFIG[sc.key]) {
@@ -428,6 +429,9 @@ Generate all AI deliverables for this stage and list open questions.`;
         break;
       case 'openrouter':
         raw = await callOpenRouter(systemPrompt, userPrompt);
+        break;
+      case 'nvidia':
+        raw = await callNvidia(systemPrompt, userPrompt);
         break;
       default:
         raw = await callOllama(systemPrompt, userPrompt, models[0]);
