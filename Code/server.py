@@ -29,6 +29,7 @@ from urllib.parse import urlparse
 
 PORT = 8080
 OLLAMA_BASE = "http://localhost:11434"
+NVIDIA_BASE = "https://integrate.api.nvidia.com/v1"
 SESSIONS_DIR = Path(__file__).parent / "sessions"
 STATIC_DIR = Path(__file__).parent
 CONFIG_FILE = SESSIONS_DIR / "config.json"
@@ -265,6 +266,11 @@ class PipelineHandler(http.server.SimpleHTTPRequestHandler):
             self._proxy_ollama(m.group(1))
             return
 
+        # ── NVIDIA NIM proxy ──
+        if path == "/api/nvidia":
+            self._proxy_nvidia()
+            return
+
         self.send_error(404, "Not found")
 
     def do_PUT(self):
@@ -380,6 +386,46 @@ class PipelineHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             self.send_error(500, f"Proxy error: {str(e)}")
 
+    def _proxy_nvidia(self):
+        """Forward a request to NVIDIA NIM and return its response."""
+        body = self._read_body()
+        api_key = body.pop("_apiKey", "")
+        if not api_key:
+            self.send_error(400, "Missing NVIDIA API key")
+            return
+
+        target_url = f"{NVIDIA_BASE}/chat/completions"
+
+        try:
+            data = json.dumps(body).encode("utf-8") if body else None
+            req = urllib.request.Request(
+                target_url,
+                data=data,
+                method="POST",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {api_key}",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                response_body = resp.read()
+                self.send_response(resp.status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(response_body)))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(response_body)
+        except urllib.error.HTTPError as e:
+            try:
+                err_body = e.read().decode("utf-8")
+                self._send_json({"error": err_body}, status=e.code)
+            except Exception:
+                self.send_error(e.code, str(e.reason))
+        except urllib.error.URLError as e:
+            self.send_error(502, f"NVIDIA connection failed: {e.reason}")
+        except Exception as e:
+            self.send_error(500, f"NVIDIA proxy error: {str(e)}")
+
     def log_message(self, format, *args):
         """Quieter logging — only log API calls and errors."""
         msg = format % args
@@ -398,6 +444,7 @@ if __name__ == "__main__":
     print(f"📁 Sessions stored in: {SESSIONS_DIR}")
     print(f"📦 Exports stored in: {EXPORTS_DIR}")
     print(f"🔌 Ollama proxy: http://localhost:{PORT}/api/ollama/... → {OLLAMA_BASE}/api/...")
+    print(f"🔌 NVIDIA NIM proxy: http://localhost:{PORT}/api/nvidia → {NVIDIA_BASE}/chat/completions")
     print()
     print("To expose via Cloudflare Tunnel:")
     print(f"    cloudflared tunnel --url http://localhost:{PORT}")

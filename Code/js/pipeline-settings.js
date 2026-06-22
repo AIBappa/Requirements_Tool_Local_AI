@@ -621,10 +621,19 @@ async function testNvidia() {
   if (!key) { el.textContent = '⚠️ Enter an API key first'; el.style.color = 'var(--warning)'; return; }
   el.textContent = 'Testing…'; el.style.color = 'var(--text-3)';
   try {
-    const r = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+    const isServerMode = window.location.protocol !== 'file:';
+    const url = isServerMode ? '/api/nvidia' : 'https://integrate.api.nvidia.com/v1/chat/completions';
+    const body = { model, max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] };
+    const headers = { 'Content-Type': 'application/json' };
+    if (isServerMode) {
+      body._apiKey = key;
+    } else {
+      headers['Authorization'] = 'Bearer ' + key;
+    }
+    const r = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-      body: JSON.stringify({ model, max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
+      headers: headers,
+      body: JSON.stringify(body)
     });
     if (r.ok) { el.textContent = '✅ Connected — ' + model; el.style.color = 'var(--success)'; }
     else { const d = await r.json(); el.textContent = '❌ ' + (d.error?.message || 'Connection failed'); el.style.color = 'var(--danger)'; }

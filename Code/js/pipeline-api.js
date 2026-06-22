@@ -131,20 +131,28 @@ async function callOpenRouter(system, user) {
 }
 
 async function callNvidia(system, user) {
-  const r = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+  const isServerMode = window.location.protocol !== 'file:';
+  const url = isServerMode ? '/api/nvidia' : 'https://integrate.api.nvidia.com/v1/chat/completions';
+  const body = {
+    model: CONFIG.nvidiaModel,
+    max_tokens: 2000,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user }
+    ]
+  };
+  // In server mode, send API key as a special field the proxy extracts
+  if (isServerMode) {
+    body._apiKey = CONFIG.nvidiaKey;
+  }
+  const headers = { 'Content-Type': 'application/json' };
+  if (!isServerMode) {
+    headers['Authorization'] = 'Bearer ' + CONFIG.nvidiaKey;
+  }
+  const r = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + CONFIG.nvidiaKey
-    },
-    body: JSON.stringify({
-      model: CONFIG.nvidiaModel,
-      max_tokens: 2000,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user }
-      ]
-    })
+    headers: headers,
+    body: JSON.stringify(body)
   });
   const data = await r.json();
   if (!r.ok) throw new Error(data.error?.message || 'NVIDIA NIM API error');
