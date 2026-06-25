@@ -22,7 +22,9 @@ const CONFIG = {
   openrouterKey: '',
   openrouterModel: 'deepseek/deepseek-chat',
   nvidiaKey: '',
-  nvidiaModel: 'minimaxai/minimax-m3'
+  nvidiaModel: 'minimaxai/minimax-m3',
+  siliconflowKey: '',
+  siliconflowModel: 'Qwen/Qwen3-32B'
 };
 
 const DATA_VERSION = 3;
@@ -73,6 +75,7 @@ function getProviderLabel() {
     case 'cerebras': return '🟡 Cerebras';
     case 'openrouter': return '🧡 OpenRouter';
     case 'nvidia': return '🟢 NVIDIA NIM';
+    case 'siliconflow': return '🔷 SiliconFlow';
     default: return 'Not set';
   }
 }
@@ -383,7 +386,9 @@ function openSetup() {
     'openrouter-key-input': CONFIG.openrouterKey,
     'openrouter-model-select': CONFIG.openrouterModel,
     'nvidia-key-input': CONFIG.nvidiaKey,
-    'nvidia-model-select': CONFIG.nvidiaModel
+    'nvidia-model-select': CONFIG.nvidiaModel,
+    'siliconflow-key-input': CONFIG.siliconflowKey,
+    'siliconflow-model-select': CONFIG.siliconflowModel
   };
   Object.keys(map).forEach(id => {
     const el = document.getElementById(id);
@@ -418,6 +423,8 @@ function saveSetup() {
   CONFIG.openrouterModel = document.getElementById('openrouter-model-select')?.value || CONFIG.openrouterModel;
   CONFIG.nvidiaKey = (document.getElementById('nvidia-key-input')?.value || '').trim();
   CONFIG.nvidiaModel = document.getElementById('nvidia-model-select')?.value || CONFIG.nvidiaModel;
+  CONFIG.siliconflowKey = (document.getElementById('siliconflow-key-input')?.value || '').trim();
+  CONFIG.siliconflowModel = document.getElementById('siliconflow-model-select')?.value || CONFIG.siliconflowModel;
 
   const statusEl = document.getElementById('setup-footer-status');
   if (!statusEl) { closeSetup(); updateSetupIndicator(); saveToStorage(); showToast(getProviderLabel() + ' mode active'); return; }
@@ -430,7 +437,8 @@ function saveSetup() {
     groq: { key: 'groqKey', label: 'a Groq API key' },
     cerebras: { key: 'cerebrasKey', label: 'a Cerebras API key' },
     openrouter: { key: 'openrouterKey', label: 'an OpenRouter API key' },
-    nvidia: { key: 'nvidiaKey', label: 'a NVIDIA NIM API key' }
+    nvidia: { key: 'nvidiaKey', label: 'a NVIDIA NIM API key' },
+    siliconflow: { key: 'siliconflowKey', label: 'a SiliconFlow API key' }
   };
 
   const check = requiredChecks[CONFIG.mode];
@@ -634,6 +642,24 @@ async function testNvidia() {
       method: 'POST',
       headers: headers,
       body: JSON.stringify(body)
+    });
+    if (r.ok) { el.textContent = '✅ Connected — ' + model; el.style.color = 'var(--success)'; }
+    else { const d = await r.json(); el.textContent = '❌ ' + (d.error?.message || 'Connection failed'); el.style.color = 'var(--danger)'; }
+  } catch(e) { el.textContent = '❌ ' + e.message; el.style.color = 'var(--danger)'; }
+}
+
+async function testSiliconflow() {
+  const key = (document.getElementById('siliconflow-key-input')?.value || '').trim();
+  const model = document.getElementById('siliconflow-model-select')?.value || CONFIG.siliconflowModel;
+  const el = document.getElementById('siliconflow-test-result');
+  if (!el) return;
+  if (!key) { el.textContent = '⚠️ Enter an API key first'; el.style.color = 'var(--warning)'; return; }
+  el.textContent = 'Testing…'; el.style.color = 'var(--text-3)';
+  try {
+    const r = await fetch('https://api.siliconflow.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({ model, max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
     });
     if (r.ok) { el.textContent = '✅ Connected — ' + model; el.style.color = 'var(--success)'; }
     else { const d = await r.json(); el.textContent = '❌ ' + (d.error?.message || 'Connection failed'); el.style.color = 'var(--danger)'; }

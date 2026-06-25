@@ -158,3 +158,14 @@ async function callNvidia(system, user) {
   if (!r.ok) throw new Error(data.error?.message || 'NVIDIA NIM API error');
   return data.choices?.[0]?.message?.content || '';
 }
+
+async function callSiliconflow(system, user) {
+  const r = await fetch('https://api.siliconflow.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + CONFIG.siliconflowKey },
+    body: JSON.stringify({ model: CONFIG.siliconflowModel, max_tokens: 2000, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] })
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error?.message || 'SiliconFlow API error');
+  return data.choices?.[0]?.message?.content || '';
+}

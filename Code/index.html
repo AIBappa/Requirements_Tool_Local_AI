@@ -25,6 +25,7 @@
       <div class="setup-tab" data-tab="cerebras" onclick="switchSetupTab('cerebras')">🟡 Cerebras</div>
       <div class="setup-tab" data-tab="openrouter" onclick="switchSetupTab('openrouter')">🧡 OpenRouter</div>
       <div class="setup-tab" data-tab="nvidia" onclick="switchSetupTab('nvidia')">🟢 NVIDIA NIM</div>
+      <div class="setup-tab" data-tab="siliconflow" onclick="switchSetupTab('siliconflow')">🔷 SiliconFlow</div>
     </div>
 
     <!-- Local tab -->
@@ -262,6 +263,33 @@ ollama pull phi3:mini</div>
       <div class="setup-section">
         <button class="btn btn-primary" onclick="testNvidia()" style="font-size:12px;padding:7px 14px;">Test API Key</button>
         <span id="nvidia-test-result" style="font-size:12px;color:var(--text-3);margin-left:10px;">Not tested yet</span>
+      </div>
+    </div>
+
+    <!-- SiliconFlow tab -->
+    <div class="setup-pane" id="tab-siliconflow">
+      <div class="setup-section">
+        <h3>SiliconFlow API key</h3>
+        <p>Get your API key at <a href="https://cloud.siliconflow.com" target="_blank" rel="noopener">cloud.siliconflow.com</a> — access Qwen, DeepSeek, and more models via OpenAI-compatible API.</p>
+        <label class="setup-label">API Key</label>
+        <div class="setup-row">
+          <input class="setup-input" id="siliconflow-key-input" type="password" placeholder="sk-..." autocomplete="off" />
+          <button class="btn" onclick="toggleKeyVisibility('siliconflow-key-input')" style="font-size:12px;padding:7px 12px;">👁</button>
+        </div>
+      </div>
+      <div class="setup-section">
+        <h3>Model</h3>
+        <select class="setup-input" id="siliconflow-model-select" style="font-family:var(--mono);">
+          <option value="Qwen/Qwen3-32B">Qwen/Qwen3-32B (recommended)</option>
+          <option value="Qwen/Qwen2.5-Coder-32B">Qwen/Qwen2.5-Coder-32B</option>
+          <option value="deepseek-ai/DeepSeek-V3">deepseek-ai/DeepSeek-V3</option>
+          <option value="deepseek-ai/DeepSeek-R1">deepseek-ai/DeepSeek-R1</option>
+          <option value="deepseek-ai/DeepSeek-Coder-V2">deepseek-ai/DeepSeek-Coder-V2</option>
+        </select>
+      </div>
+      <div class="setup-section">
+        <button class="btn btn-primary" onclick="testSiliconflow()" style="font-size:12px;padding:7px 14px;">Test API Key</button>
+        <span id="siliconflow-test-result" style="font-size:12px;color:var(--text-3);margin-left:10px;">Not tested yet</span>
       </div>
     </div>
 

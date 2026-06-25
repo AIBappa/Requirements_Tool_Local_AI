@@ -775,6 +775,7 @@ Return ONLY valid JSON in this exact format:
       case 'cerebras': raw = await callCerebras(systemPrompt, userPrompt); break;
       case 'openrouter': raw = await callOpenRouter(systemPrompt, userPrompt); break;
       case 'nvidia': raw = await callNvidia(systemPrompt, userPrompt); break;
+      case 'siliconflow': raw = await callSiliconflow(systemPrompt, userPrompt); break;
       default: raw = await callOllama(systemPrompt, userPrompt, models[0]);
     }
 
@@ -843,6 +844,7 @@ Use a clear text-based diagram format (you can use ASCII art or a descriptive hi
       case 'cerebras': raw = await callCerebras(systemPrompt, userPrompt); break;
       case 'openrouter': raw = await callOpenRouter(systemPrompt, userPrompt); break;
       case 'nvidia': raw = await callNvidia(systemPrompt, userPrompt); break;
+      case 'siliconflow': raw = await callSiliconflow(systemPrompt, userPrompt); break;
       default: raw = await callOllama(systemPrompt, userPrompt, models[0]);
     }
 

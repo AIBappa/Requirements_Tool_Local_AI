@@ -88,6 +88,7 @@ async function frsCallAI(systemPrompt, userContent) {
     case 'cerebras':   raw = await callCerebras(systemPrompt, userContent); break;
     case 'openrouter': raw = await callOpenRouter(systemPrompt, userContent); break;
     case 'nvidia':     raw = await callNvidia(systemPrompt, userContent); break;
+    case 'siliconflow': raw = await callSiliconflow(systemPrompt, userContent); break;
     default:           raw = await callOllama(systemPrompt, userContent, models[0]); break;
   }
   raw = raw.replace(/^```json\s*/gm, '').replace(/```\s*$/gm, '').trim();
