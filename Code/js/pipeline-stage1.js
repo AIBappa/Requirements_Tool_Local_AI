@@ -116,43 +116,306 @@ function saveStage1Inputs() {
 
 // ─── Main Stage 1 Renderer ───
 
-/** Main Stage 1 renderer with accordion sections */
+let s1WizardStep = 0;
+let s1WizardSections = [];
+
+/** Main Stage 1 renderer — wizard style */
 function renderStage1PRD(content) {
   const sd = stageData[1];
 
-  // Header with save button and progress
+  // Build ordered wizard section list
+  s1WizardSections = [];
+  STAGE1_PRD_DELIVERABLES.forEach(section => {
+    if (section.id === 'section_functions') {
+      // functions rendered dynamically later, keep placeholder
+      s1WizardSections.push(section);
+    } else {
+      s1WizardSections.push(section);
+    }
+  });
+  s1WizardSections.push(STAGE1_INFRASTRUCTURE_SECTION);
+  s1WizardSections.push(STAGE1_EXTERNAL_SECTION);
+  s1WizardSections.push({ id: 'section_d5', title: '🔍 Auto-Generated Checks (D5)', isD5: true });
+  s1WizardSections.push({ id: 'section_d4', title: '🏗️ Context Diagram of Product (D4)', isD4: true });
+
+  // Restore step from saved state if available
+  if (sd._wizardStep && sd._wizardStep < s1WizardSections.length) {
+    s1WizardStep = sd._wizardStep;
+  } else {
+    s1WizardStep = 0;
+  }
+
+  // Header
   const header = document.createElement('div');
   header.className = 's1-header';
   header.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
       <div>
         <h2 style="margin:0;font-size:18px;">📋 Product Requirements Document</h2>
-        <p style="margin:4px 0 0;font-size:12px;color:var(--text-3);">Answer all questions to generate D5 Auto-Checks and D4 Context Diagram</p>
+        <p style="margin:4px 0 0;font-size:12px;color:var(--text-3);">Answer questions step by step to generate D5 Auto-Checks and D4 Context Diagram</p>
       </div>
+      <div id="s1-wizard-progress" style="font-size:11px;color:var(--text-3);"></div>
     </div>`;
   content.appendChild(header);
 
-  // Render basics and github sections first
-  STAGE1_PRD_DELIVERABLES.forEach(section => {
-    if (section.id === 'section_functions') return; // skip functions for now
-    renderAccordionSection(section, content);
+  // Wizard body container
+  const wizardBody = document.createElement('div');
+  wizardBody.id = 's1-wizard-body';
+  wizardBody.className = 's1-wizard-body';
+  content.appendChild(wizardBody);
+
+  // Wizard nav buttons
+  const nav = document.createElement('div');
+  nav.className = 's1-wizard-nav';
+  nav.id = 's1-wizard-nav';
+  content.appendChild(nav);
+
+  renderWizardStep();
+}
+
+function renderWizardStep() {
+  const sd = stageData[1];
+  const body = document.getElementById('s1-wizard-body');
+  const nav = document.getElementById('s1-wizard-nav');
+  if (!body || !nav) return;
+
+  // Ensure step in bounds
+  if (s1WizardStep < 0) s1WizardStep = 0;
+  if (s1WizardStep >= s1WizardSections.length) s1WizardStep = s1WizardSections.length - 1;
+
+  const section = s1WizardSections[s1WizardStep];
+  sd._wizardStep = s1WizardStep;
+
+  // Progress indicator
+  const progressEl = document.getElementById('s1-wizard-progress');
+  if (progressEl) {
+    progressEl.textContent = `Step ${s1WizardStep + 1} of ${s1WizardSections.length}`;
+  }
+
+  // Render section content
+  body.innerHTML = '';
+  const sectionCard = document.createElement('div');
+  sectionCard.className = 's1-accordion';
+  sectionCard.innerHTML = `
+    <div class="s1-accordion-header open" style="cursor:default;">
+      <div class="s1-accordion-title">
+        <span>${escHtml(section.title)}</span>
+      </div>
+    </div>
+    <div class="s1-accordion-body" style="display:block;max-height:none;">
+      <div class="s1-items" id="s1-wizard-items"></div>
+    </div>`;
+  body.appendChild(sectionCard);
+
+  const itemsContainer = sectionCard.querySelector('#s1-wizard-items');
+
+  if (section.isD5) {
+    renderD5Section(itemsContainer);
+  } else if (section.isD4) {
+    renderD4Section(itemsContainer);
+  } else if (section.id === 'section_infrastructure') {
+    section.items.forEach(item => {
+      const el = renderStage1Item(item, section.id);
+      if (el) {
+        if (item.type === 'statement') {
+          el.className = 's1-statement';
+          el.innerHTML = `<div class="s1-statement-icon">📌</div><div>${escHtml(item.desc)}</div>`;
+        }
+        itemsContainer.appendChild(el);
+      }
+    });
+  } else if (section.id === 'section_external') {
+    section.items.forEach(item => {
+      if (item.type === 'statement') {
+        const st = document.createElement('div');
+        st.className = 's1-statement';
+        st.innerHTML = `<div class="s1-statement-icon">📌</div><div>${escHtml(item.desc)}</div>`;
+        itemsContainer.appendChild(st);
+      } else if (item.type === 'yesno' || item.type === 'checkboxes') {
+        const el = renderStage1Item(item, section.id);
+        if (el) itemsContainer.appendChild(el);
+      }
+    });
+    renderExternalDynamicFields(itemsContainer);
+  } else if (section.id === 'section_functions') {
+    renderFunctionsWizardStep(itemsContainer);
+  } else {
+    // Standard accordion section (basics, github)
+    section.items.forEach(item => {
+      const el = renderStage1Item(item, section.id);
+      if (el) itemsContainer.appendChild(el);
+    });
+  }
+
+  // Navigation buttons
+  nav.innerHTML = '';
+  const prevBtn = document.createElement('button');
+  prevBtn.className = 'btn';
+  prevBtn.textContent = '← Previous';
+  prevBtn.disabled = s1WizardStep === 0;
+  prevBtn.onclick = () => {
+    saveStage1Inputs();
+    s1WizardStep--;
+    renderWizardStep();
+  };
+
+  const nextBtn = document.createElement('button');
+  nextBtn.className = 'btn btn-primary';
+  nextBtn.textContent = s1WizardStep === s1WizardSections.length - 1 ? 'Finish' : 'Next →';
+  nextBtn.onclick = () => {
+    saveStage1Inputs();
+    if (s1WizardStep < s1WizardSections.length - 1) {
+      s1WizardStep++;
+      renderWizardStep();
+    } else {
+      showToast('PRD form complete — scroll down for D5 and D4', 'success');
+    }
+  };
+
+  nav.appendChild(prevBtn);
+  nav.appendChild(nextBtn);
+}
+
+/** Render functions wizard step with dynamic sub-sections */
+function renderFunctionsWizardStep(container) {
+  const sd = stageData[1];
+  const count = sd.functionCount || 0;
+
+  // Function count input at top
+  const countContainer = document.createElement('div');
+  countContainer.className = 's1-item';
+  countContainer.innerHTML = `
+    <div class="s1-item-label">
+      <span class="s1-item-id">D1.4.1</span>
+      How many functions? Enter Integer.
+      <span class="s1-tag-badge" id="tag-D1.4.1"></span>
+    </div>
+    <div class="s1-item-hint">Imagine cutting the product horizontally. Enter 1-10.</div>
+    <input type="number" class="s1-input" min="1" max="10" value="${count || ''}" placeholder="Enter number (1-10)"
+      onchange="onFunctionCountChange(this.value); renderFunctionsWizardStep(document.getElementById('s1-wizard-items'));" />
+  `;
+  container.appendChild(countContainer);
+
+  if (count > 0) {
+    // Render each function as a mini-accordion
+    for (let i = 0; i < count; i++) {
+      const fnCard = document.createElement('div');
+      fnCard.className = 's1-item';
+      fnCard.style.padding = '0';
+      fnCard.style.overflow = 'hidden';
+      fnCard.style.borderLeft = '3px solid var(--accent)';
+
+      const nameVal = sd.functionNames[i] || '';
+      const summaryVal = sd.functionSummaries[i] || '';
+      const selected = sd.functionScoping[i] || [];
+
+      fnCard.innerHTML = `
+        <div class="s1-accordion-header open" style="cursor:pointer;padding:10px 14px;background:var(--surface-2);">
+          <div class="s1-accordion-title">
+            <span>⚙️ Function ${i+1}: ${escHtml(nameVal || '(unnamed)')}</span>
+          </div>
+          <div class="s1-accordion-toggle">▼</div>
+        </div>
+        <div class="s1-accordion-body" style="display:block;padding:12px 14px;background:var(--surface);">
+          <div class="s1-item" style="margin-bottom:10px;padding:0;border:none;background:transparent;">
+            <div class="s1-item-label"><span class="s1-item-id">D1.4.2.${i+1}</span> Name of function ${i+1}</div>
+            <input class="s1-input" data-stage1-fn="name" data-idx="${i}" value="${escHtml(nameVal)}" placeholder="Enter function name…" onchange="onFunctionNameChange(${i}, this.value)" />
+          </div>
+          <div class="s1-item" style="margin-bottom:10px;padding:0;border:none;background:transparent;">
+            <div class="s1-item-label"><span class="s1-item-id">D2.1.${i+1}</span> Function ${i+1} summary</div>
+            <div class="s1-item-hint">Describe what this function does, its inputs, outputs, and who uses it.</div>
+            <textarea class="s1-textarea" data-stage1-fn="summary" data-idx="${i}" placeholder="Enter function summary…">${escHtml(summaryVal)}</textarea>
+          </div>
+          <div class="s1-item" style="padding:0;border:none;background:transparent;">
+            <div class="s1-item-label"><span class="s1-item-id">D2.2.${i+1}</span> For function ${i+1}, scope its impact</div>
+            <div class="s1-item-hint">Tick all infrastructure components this function touches.</div>
+            <div class="s1-scoping-options" id="s1-scoping-${i}"></div>
+          </div>
+        </div>
+      `;
+
+      // Toggle for mini-accordion
+      const header = fnCard.querySelector('.s1-accordion-header');
+      const body = fnCard.querySelector('.s1-accordion-body');
+      const toggle = fnCard.querySelector('.s1-accordion-toggle');
+      header.addEventListener('click', () => {
+        const isOpen = body.style.display === 'none';
+        body.style.display = isOpen ? 'block' : 'none';
+        toggle.textContent = isOpen ? '▼' : '▶';
+      });
+
+      container.appendChild(fnCard);
+
+      // Render dynamic scoping checkboxes inside this function card
+      const scopingContainer = fnCard.querySelector(`#s1-scoping-${i}`);
+      renderScopingCheckboxes(scopingContainer, i, selected);
+    }
+  }
+}
+
+/** Render scoping checkboxes derived from infrastructure */
+function renderScopingCheckboxes(container, idx, selected) {
+  const options = getActiveScopingOptions();
+  const optsToShow = options.length > 0 ? options : ['(Complete Infrastructure section first)'];
+
+  let html = '<div class="s1-checkbox-group" style="flex-wrap:wrap;gap:4px;">';
+  optsToShow.forEach(opt => {
+    const disabled = opt.startsWith('(') ? 'disabled' : '';
+    const val = opt.startsWith('(') ? '' : opt;
+    const checked = selected.includes(val) ? 'checked' : '';
+    const opacity = opt.startsWith('(') ? 'opacity:0.5;' : '';
+    html += `
+      <label class="s1-checkbox-opt" style="font-size:12px;${opacity}">
+        <input type="checkbox" data-stage1-type="scoping" data-stage1-id="${idx}" value="${escHtml(val)}" ${checked} ${disabled}
+          onchange="onFunctionScopingChange(${idx}, '${escHtml(val)}', this.checked)" />
+        ${escHtml(opt)}
+      </label>
+    `;
   });
+  html += '</div>';
+  container.innerHTML = html;
+}
 
-  // Render infrastructure section BEFORE functions
-  renderInfrastructureSection(content);
+/** Keep compatibility with old call sites that pass a container */
+function renderFunctionInstances(count, container) {
+  // Legacy wrapper — delegates to wizard renderer
+  renderFunctionsWizardStep(container || document.getElementById('s1-func-instances'));
+}
 
-  // Render functions section AFTER infrastructure
-  const funcSection = STAGE1_PRD_DELIVERABLES.find(s => s.id === 'section_functions');
-  if (funcSection) renderAccordionSection(funcSection, content);
+/** Render external linkages dynamic fields */
+function renderExternalDynamicFields(container) {
+  const sd = stageData[1];
+  const externalCounts = sd.externalCounts || { bff: 0, perm: 0, imm: 0 };
+  ['bff', 'perm', 'imm'].forEach(type => {
+    const template = type === 'bff' ? STAGE1_EXTERNAL_DYNAMIC[0] : type === 'perm' ? STAGE1_EXTERNAL_DYNAMIC[1] : STAGE1_EXTERNAL_DYNAMIC[2];
+    const count = externalCounts[type] || 0;
 
-  // Render external linkages section
-  renderExternalSection(content);
+    for (let i = 1; i <= count; i++) {
+      const id = template.template.replace('{n}', type + '_' + i);
+      const label = template.desc.replace('{n}', String(i));
+      const val = sd.inputs[id] || '';
+      const item = document.createElement('div');
+      item.className = 's1-item';
+      item.innerHTML = `
+        <div class="s1-item-label">
+          <span class="s1-item-id">${id}</span>
+          ${escHtml(label)}
+        </div>
+        <input class="s1-input" data-stage1-id="${id}" value="${escHtml(val)}" placeholder="Enter external product name…" />
+      `;
+      container.appendChild(item);
+    }
 
-  // D5 Auto-Checks section
-  renderD5Section(content);
-
-  // D4 Context Diagram section
-  renderD4Section(content);
+    const addBtn = document.createElement('div');
+    addBtn.className = 's1-add-btn';
+    addBtn.innerHTML = `➕ Add external product (${type === 'bff' ? 'BFF' : type === 'perm' ? 'Database' : 'In-Memory'})`;
+    addBtn.onclick = () => {
+      sd.externalCounts = sd.externalCounts || { bff: 0, perm: 0, imm: 0 };
+      sd.externalCounts[type]++;
+      renderWizardStep();
+    };
+    container.appendChild(addBtn);
+  });
 }
 
 /** Render an accordion section */

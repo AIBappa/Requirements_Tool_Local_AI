@@ -645,6 +645,25 @@ body.assist-open #main { padding-bottom: 420px; }
 
 /* ─── Stage 1 PRD Styles ─── */
 
+.s1-wizard-body {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  min-height: 320px;
+}
+
+.s1-wizard-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0;
+  margin-bottom: 12px;
+}
+.s1-wizard-nav .btn {
+  min-width: 120px;
+}
+
 .s1-header {
   padding: 16px 20px;
   background: var(--surface);
