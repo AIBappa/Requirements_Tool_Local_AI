@@ -18,6 +18,20 @@ function getFunctionInstances() {
   return { count, names, summaries, scoping };
 }
 
+/** Derive scoping options from infrastructure selections */
+function getActiveScopingOptions() {
+  const sd = stageData[1];
+  const options = [];
+  if (sd.inputs['D1.6.1.1'] === 'yes') options.push('Public Webapp');
+  if (sd.inputs['D1.6.2.1'] === 'yes') options.push('Private Webapp');
+  if (sd.inputs['D1.6.5.1'] === 'yes') options.push('Public BFF');
+  if (sd.inputs['D1.6.6.1'] === 'yes') options.push('Private BFF');
+  if (sd.inputs['D1.6.7.1'] === 'yes') options.push('Permanent Database');
+  if (sd.inputs['D1.6.9.1'] === 'yes') options.push('In-memory Database');
+  if (sd.inputs['D3.1'] === 'yes') options.push('External Links');
+  return options;
+}
+
 /** Count answered items in a section for progress */
 function countSectionAnswered(sectionId) {
   const sd = stageData[1];
@@ -118,13 +132,18 @@ function renderStage1PRD(content) {
     </div>`;
   content.appendChild(header);
 
-  // Render each accordion section
+  // Render basics and github sections first
   STAGE1_PRD_DELIVERABLES.forEach(section => {
+    if (section.id === 'section_functions') return; // skip functions for now
     renderAccordionSection(section, content);
   });
 
-  // Render infrastructure section
+  // Render infrastructure section BEFORE functions
   renderInfrastructureSection(content);
+
+  // Render functions section AFTER infrastructure
+  const funcSection = STAGE1_PRD_DELIVERABLES.find(s => s.id === 'section_functions');
+  if (funcSection) renderAccordionSection(funcSection, content);
 
   // Render external linkages section
   renderExternalSection(content);
@@ -532,18 +551,24 @@ function renderFunctionInstances(count, container) {
     }
 
     html += '<div class="s1-subsection-title" style="margin-top:12px;">Function Impact Scoping</div>';
+    const activeOptions = getActiveScopingOptions();
     for (let i = 0; i < count; i++) {
       const selected = sd.functionScoping[i] || [];
-      let checks = SCOPING_OPTIONS.map(opt => `
-        <label class="s1-checkbox-opt" style="font-size:12px;">
-          <input type="checkbox" data-stage1-type="scoping" data-stage1-id="${i}" value="${escHtml(opt)}" ${selected.includes(opt) ? 'checked' : ''}
-            onchange="onFunctionScopingChange(${i}, '${escHtml(opt)}', this.checked)" />
-          ${escHtml(opt)}
-        </label>
-      `).join('');
+      const optionsToShow = activeOptions.length > 0 ? activeOptions : ['(Complete Infrastructure section first)'];
+      let checks = optionsToShow.map(opt => {
+        const disabled = opt.startsWith('(') ? 'disabled' : '';
+        const val = opt.startsWith('(') ? '' : opt;
+        return `
+          <label class="s1-checkbox-opt" style="font-size:12px;${opt.startsWith('(') ? 'opacity:0.5;' : ''}">
+            <input type="checkbox" data-stage1-type="scoping" data-stage1-id="${i}" value="${escHtml(val)}" ${selected.includes(val) ? 'checked' : ''} ${disabled}
+              onchange="onFunctionScopingChange(${i}, '${escHtml(val)}', this.checked)" />
+            ${escHtml(opt)}
+          </label>
+        `;
+      }).join('');
       html += `<div class="s1-item" style="padding-left:16px;border-left:2px solid var(--warning);margin:4px 0;">
         <div class="s1-item-label"><span class="s1-item-id">D2.2.${i+1}</span> For function ${i+1}, scope its impact</div>
-        <div class="s1-item-hint">Tick all infrastructure components this function touches.</div>
+        <div class="s1-item-hint">Tick all infrastructure components this function touches. Options are based on your Infrastructure selections above.</div>
         <div class="s1-checkbox-group" style="flex-wrap:wrap;gap:4px;">${checks}</div>
       </div>`;
     }
