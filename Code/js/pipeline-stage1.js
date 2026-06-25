@@ -3,20 +3,9 @@
 
 // ─── Stage 1 PRD State helpers ───
 
-/** Get dynamic function instances based on count */
-function getFunctionInstances() {
-  const sd = stageData[1];
-  if (!sd) return { count: 0, names: [], summaries: [], scoping: [] };
-  const count = parseInt(sd.functionCount) || 0;
-  if (count < 1 || count > 10) return { count: 0, names: [], summaries: [], scoping: [] };
-  const names = sd.functionNames || [];
-  const summaries = sd.functionSummaries || [];
-  const scoping = sd.functionScoping || [];
-  while (names.length < count) names.push('');
-  while (summaries.length < count) summaries.push('');
-  while (scoping.length < count) scoping.push([]);
-  return { count, names, summaries, scoping };
-}
+let s1FlatQuestions = [];
+let s1CurrentQuestion = 0;
+let s1FlowContext = { count: 0, names: [], summaries: [], scoping: [] };
 
 /** Derive scoping options from infrastructure selections */
 function getActiveScopingOptions() {
@@ -30,6 +19,89 @@ function getActiveScopingOptions() {
   if (sd.inputs['D1.6.9.1'] === 'yes') options.push('In-memory Database');
   if (sd.inputs['D3.1'] === 'yes') options.push('External Links');
   return options;
+}
+
+/** Flatten all Stage 1 questions into a single ordered list */
+function buildFlatQuestionList() {
+  const sd = stageData[1];
+  const list = [];
+  const addItem = (id, type, desc, hint, section, src, meta = {}) => {
+    list.push({ id, type, desc, hint, section, src, meta });
+  };
+  const addStatement = (id, desc, section, src) => {
+    list.push({ id, type: 'statement', desc, section, src });
+  };
+
+  // Basics section
+  const basics = STAGE1_PRD_DELIVERABLES.find(s => s.id === 'section_basics');
+  if (basics) {
+    basics.items.forEach(item => {
+      if (item.type === 'statement') addStatement(item.id, item.desc, basics.id, 'basics');
+      else if (item.type === 'manual') addItem(item.id, item.type, item.desc, item.hint, basics.id, 'basics', item);
+      else if (item.type === 'yesno') addItem(item.id, item.type, item.desc, item.hint, basics.id, 'basics', item);
+    });
+  }
+
+  // Github section
+  const github = STAGE1_PRD_DELIVERABLES.find(s => s.id === 'section_github');
+  if (github) {
+    github.items.forEach(item => {
+      if (item.type === 'statement') addStatement(item.id, item.desc, github.id, 'github');
+      else if (item.type === 'yesno') addItem(item.id, item.type, item.desc, item.hint, github.id, 'github', item);
+    });
+  }
+
+  // Infrastructure section
+  const infra = STAGE1_INFRASTRUCTURE_SECTION;
+  addStatement(infra.items[0].id, infra.items[0].desc, infra.id, 'infra');
+  for (let i = 1; i < infra.items.length; i++) {
+    const item = infra.items[i];
+    addItem(item.id, item.type, item.desc, item.hint, infra.id, 'infra', item);
+  }
+
+  // Function count (from functions section)
+  const funcs = STAGE1_PRD_DELIVERABLES.find(s => s.id === 'section_functions');
+  if (funcs) {
+    funcs.items.forEach(item => {
+      if (item.type === 'statement') addStatement(item.id, item.desc, funcs.id, 'functions');
+      else if (item.type === 'manual' && item.isFunctionCount) {
+        addItem(item.id, 'function_count', item.desc, item.hint, funcs.id, 'functions', item);
+      }
+    });
+  }
+
+  // Function names (dynamic based on count)
+  const count = sd.functionCount || 0;
+  for (let i = 0; i < count; i++) {
+    addItem('D1.4.2.' + (i + 1), 'function_name', 'Name of function ' + (i + 1), 'Enter a short, descriptive name.', funcs.id, 'functions', { idx: i });
+    addItem('D2.1.' + (i + 1), 'function_summary', 'Function ' + (i + 1) + ' summary', 'Describe what this function does, its inputs, outputs, and who uses it.', funcs.id, 'functions', { idx: i });
+    addItem('D2.2.' + (i + 1), 'function_scoping', 'For function ' + (i + 1) + ', scope its impact', 'Tick all infrastructure components this function touches.', funcs.id, 'functions', { idx: i });
+  }
+
+  // External linkages section
+  const ext = STAGE1_EXTERNAL_SECTION;
+  addStatement(ext.items[0].id, ext.items[0].desc, ext.id, 'external');
+  ext.items.forEach(item => {
+    if (item.type !== 'statement') {
+      addItem(item.id, item.type, item.desc, item.hint, ext.id, 'external', item);
+    }
+  });
+
+  return list;
+}
+
+function buildS1FlowContext() {
+  const sd = stageData[1];
+  const count = parseInt(sd.functionCount) || 0;
+  s1FlowContext.count = count;
+  s1FlowContext.names = [];
+  s1FlowContext.summaries = [];
+  s1FlowContext.scoping = [];
+  for (let i = 0; i < count; i++) {
+    s1FlowContext.names.push(sd.functionNames[i] || '');
+    s1FlowContext.summaries.push(sd.functionSummaries[i] || '');
+    s1FlowContext.scoping.push(sd.functionScoping[i] || []);
+  }
 }
 
 /** Count answered items in a section for progress */
@@ -114,166 +186,325 @@ function saveStage1Inputs() {
   saveToStorage();
 }
 
-// ─── Main Stage 1 Renderer ───
+// ─── Flattened Question Wizard ───
 
-let s1WizardStep = 0;
-let s1WizardSections = [];
+/** Build the flattened question list */
+function buildFlatQuestionList() {
+  const sd = stageData[1];
+  const list = [];
+  const addItem = (id, type, desc, hint, section, src, meta = {}) => {
+    list.push({ id, type, desc, hint, section, src, meta });
+  };
+  const addStatement = (id, desc, section, src) => {
+    list.push({ id, type: 'statement', desc, section, src });
+  };
 
-/** Main Stage 1 renderer — wizard style */
+  // Basics
+  const basics = STAGE1_PRD_DELIVERABLES.find(s => s.id === 'section_basics');
+  if (basics) {
+    basics.items.forEach(item => {
+      if (item.type === 'statement') addStatement(item.id, item.desc, basics.id, 'basics');
+      else if (item.type === 'manual') addItem(item.id, item.type, item.desc, item.hint, basics.id, 'basics', item);
+      else if (item.type === 'yesno') addItem(item.id, item.type, item.desc, item.hint, basics.id, 'basics', item);
+    });
+  }
+
+  // Github
+  const github = STAGE1_PRD_DELIVERABLES.find(s => s.id === 'section_github');
+  if (github) {
+    github.items.forEach(item => {
+      if (item.type === 'statement') addStatement(item.id, item.desc, github.id, 'github');
+      else if (item.type === 'yesno') addItem(item.id, item.type, item.desc, item.hint, github.id, 'github', item);
+    });
+  }
+
+  // Infrastructure
+  const infra = STAGE1_INFRASTRUCTURE_SECTION;
+  addStatement(infra.items[0].id, infra.items[0].desc, infra.id, 'infra');
+  for (let i = 1; i < infra.items.length; i++) {
+    const item = infra.items[i];
+    addItem(item.id, item.type, item.desc, item.hint, infra.id, 'infra', item);
+  }
+
+  // Functions count
+  const funcs = STAGE1_PRD_DELIVERABLES.find(s => s.id === 'section_functions');
+  if (funcs) {
+    funcs.items.forEach(item => {
+      if (item.type === 'statement') addStatement(item.id, item.desc, funcs.id, 'functions');
+      else if (item.type === 'manual' && item.isFunctionCount) {
+        addItem(item.id, 'function_count', item.desc, item.hint, funcs.id, 'functions', item);
+      }
+    });
+  }
+
+  // Dynamic function fields
+  const count = sd.functionCount || 0;
+  for (let i = 0; i < count; i++) {
+    addItem('D1.4.2.' + (i + 1), 'function_name', 'Name of function ' + (i + 1), 'Enter a short, descriptive name.', funcs.id, 'functions', { idx: i });
+    addItem('D2.1.' + (i + 1), 'function_summary', 'Function ' + (i + 1) + ' summary', 'Describe what this function does, its inputs, outputs, and who uses it.', funcs.id, 'functions', { idx: i });
+    addItem('D2.2.' + (i + 1), 'function_scoping', 'For function ' + (i + 1) + ', scope its impact', 'Tick all infrastructure components this function touches.', funcs.id, 'functions', { idx: i });
+  }
+
+  // External linkages
+  const ext = STAGE1_EXTERNAL_SECTION;
+  addStatement(ext.items[0].id, ext.items[0].desc, ext.id, 'external');
+  ext.items.forEach(item => {
+    if (item.type !== 'statement') {
+      addItem(item.id, item.type, item.desc, item.hint, ext.id, 'external', item);
+    }
+  });
+
+  return list;
+}
+
+function buildS1FlowContext() {
+  const sd = stageData[1];
+  const count = parseInt(sd.functionCount) || 0;
+  s1FlowContext.count = count;
+  s1FlowContext.names = [];
+  s1FlowContext.summaries = [];
+  s1FlowContext.scoping = [];
+  for (let i = 0; i < count; i++) {
+    s1FlowContext.names.push(sd.functionNames[i] || '');
+    s1FlowContext.summaries.push(sd.functionSummaries[i] || '');
+    s1FlowContext.scoping.push(sd.functionScoping[i] || []);
+  }
+}
+
+function countSectionAnswered(sectionId) {
+  const sd = stageData[1];
+  if (!sd) return [0, 0];
+  let total = 0;
+  let answered = 0;
+  const countItems = (items) => {
+    items.forEach(item => {
+      if (item.type === 'statement') return;
+      total++;
+      const val = sd.inputs[item.id];
+      if (item.type === 'yesno') {
+        if (val === 'yes' || val === 'no') answered++;
+      } else if (item.type === 'manual') {
+        if (val && val.trim()) answered++;
+      } else if (item.type === 'checkboxes') {
+        if (val && Array.isArray(val) && val.length > 0) answered++;
+      } else if (item.type === 'scoping') {
+        if (val && Array.isArray(val) && val.length > 0) answered++;
+      } else {
+        if (val && val.trim()) answered++;
+      }
+    });
+  };
+  const allSections = [STAGE1_PRD_DELIVERABLES, [STAGE1_INFRASTRUCTURE_SECTION], [STAGE1_EXTERNAL_SECTION]];
+  for (const group of allSections) {
+    for (const section of group) {
+      if (section.id === sectionId && section.items) {
+        countItems(section.items);
+      }
+    }
+  }
+  return [answered, total];
+}
+
+// ─── Main Stage 1 Renderer — single question per page ───
+
 function renderStage1PRD(content) {
   const sd = stageData[1];
 
-  // Build ordered wizard section list
-  s1WizardSections = [];
-  STAGE1_PRD_DELIVERABLES.forEach(section => {
-    if (section.id === 'section_functions') {
-      // functions rendered dynamically later, keep placeholder
-      s1WizardSections.push(section);
-    } else {
-      s1WizardSections.push(section);
-    }
-  });
-  s1WizardSections.push(STAGE1_INFRASTRUCTURE_SECTION);
-  s1WizardSections.push(STAGE1_EXTERNAL_SECTION);
-  s1WizardSections.push({ id: 'section_d5', title: '🔍 Auto-Generated Checks (D5)', isD5: true });
-  s1WizardSections.push({ id: 'section_d4', title: '🏗️ Context Diagram of Product (D4)', isD4: true });
+  // Build flattened question list
+  s1FlatQuestions = buildFlatQuestionList();
+  buildS1FlowContext();
 
-  // Restore step from saved state if available
-  if (sd._wizardStep && sd._wizardStep < s1WizardSections.length) {
-    s1WizardStep = sd._wizardStep;
+  // Restore position
+  const saved = sd._s1Q;
+  if (typeof saved === 'number' && saved >= 0 && saved < s1FlatQuestions.length) {
+    s1CurrentQuestion = saved;
   } else {
-    s1WizardStep = 0;
+    s1CurrentQuestion = 0;
   }
 
-  // Header
-  const header = document.createElement('div');
-  header.className = 's1-header';
-  header.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-      <div>
-        <h2 style="margin:0;font-size:18px;">📋 Product Requirements Document</h2>
-        <p style="margin:4px 0 0;font-size:12px;color:var(--text-3);">Answer questions step by step to generate D5 Auto-Checks and D4 Context Diagram</p>
-      </div>
-      <div id="s1-wizard-progress" style="font-size:11px;color:var(--text-3);"></div>
-    </div>`;
-  content.appendChild(header);
+  // Stage progress bar (top)
+  const stageBar = document.createElement('div');
+  stageBar.className = 's1-stage-bar';
+  stageBar.id = 's1-stage-bar';
+  content.appendChild(stageBar);
 
-  // Wizard body container
-  const wizardBody = document.createElement('div');
-  wizardBody.id = 's1-wizard-body';
-  wizardBody.className = 's1-wizard-body';
-  content.appendChild(wizardBody);
+  // Question card
+  const card = document.createElement('div');
+  card.className = 's1-question-card';
+  card.id = 's1-question-card';
+  content.appendChild(card);
 
-  // Wizard nav buttons
+  // Navigation
   const nav = document.createElement('div');
-  nav.className = 's1-wizard-nav';
-  nav.id = 's1-wizard-nav';
+  nav.className = 's1-nav';
+  nav.id = 's1-nav';
   content.appendChild(nav);
 
-  renderWizardStep();
+  renderSingleQuestion();
 }
 
-function renderWizardStep() {
+function renderSingleQuestion() {
   const sd = stageData[1];
-  const body = document.getElementById('s1-wizard-body');
-  const nav = document.getElementById('s1-wizard-nav');
-  if (!body || !nav) return;
+  const q = s1FlatQuestions[s1CurrentQuestion];
+  if (!q) return;
 
-  // Ensure step in bounds
-  if (s1WizardStep < 0) s1WizardStep = 0;
-  if (s1WizardStep >= s1WizardSections.length) s1WizardStep = s1WizardSections.length - 1;
+  sd._s1Q = s1CurrentQuestion;
 
-  const section = s1WizardSections[s1WizardStep];
-  sd._wizardStep = s1WizardStep;
-
-  // Progress indicator
-  const progressEl = document.getElementById('s1-wizard-progress');
-  if (progressEl) {
-    progressEl.textContent = `Step ${s1WizardStep + 1} of ${s1WizardSections.length}`;
-  }
-
-  // Render section content
-  body.innerHTML = '';
-  const sectionCard = document.createElement('div');
-  sectionCard.className = 's1-accordion';
-  sectionCard.innerHTML = `
-    <div class="s1-accordion-header open" style="cursor:default;">
-      <div class="s1-accordion-title">
-        <span>${escHtml(section.title)}</span>
-      </div>
-    </div>
-    <div class="s1-accordion-body" style="display:block;max-height:none;">
-      <div class="s1-items" id="s1-wizard-items"></div>
-    </div>`;
-  body.appendChild(sectionCard);
-
-  const itemsContainer = sectionCard.querySelector('#s1-wizard-items');
-
-  if (section.isD5) {
-    renderD5Section(itemsContainer);
-  } else if (section.isD4) {
-    renderD4Section(itemsContainer);
-  } else if (section.id === 'section_infrastructure') {
-    section.items.forEach(item => {
-      const el = renderStage1Item(item, section.id);
-      if (el) {
-        if (item.type === 'statement') {
-          el.className = 's1-statement';
-          el.innerHTML = `<div class="s1-statement-icon">📌</div><div>${escHtml(item.desc)}</div>`;
-        }
-        itemsContainer.appendChild(el);
+  // Stage progress bar
+  const stageBar = document.getElementById('s1-stage-bar');
+  if (stageBar) {
+    const stageList = ['1','2','3','4','5','6','7','8','9'];
+    const stageNames = ['PRD','SRS/FRS','Validation Gate','Architecture','Security Gate','SDD','Task Gate','Code Gen','Integration'];
+    const currentStageNum = currentStage;
+    let html = '<div class="s1-stage-track">';
+    stageList.forEach((n, idx) => {
+      const active = idx + 1 === currentStageNum;
+      const done = idx + 1 < currentStageNum;
+      html += `<div class="s1-stage-dot ${active ? 'active' : ''} ${done ? 'done' : ''}">${n}</div>`;
+      if (idx < stageList.length - 1) {
+        html += `<div class="s1-stage-arrow ${done ? 'done' : ''}">→</div>`;
       }
     });
-  } else if (section.id === 'section_external') {
-    section.items.forEach(item => {
-      if (item.type === 'statement') {
-        const st = document.createElement('div');
-        st.className = 's1-statement';
-        st.innerHTML = `<div class="s1-statement-icon">📌</div><div>${escHtml(item.desc)}</div>`;
-        itemsContainer.appendChild(st);
-      } else if (item.type === 'yesno' || item.type === 'checkboxes') {
-        const el = renderStage1Item(item, section.id);
-        if (el) itemsContainer.appendChild(el);
-      }
-    });
-    renderExternalDynamicFields(itemsContainer);
-  } else if (section.id === 'section_functions') {
-    renderFunctionsWizardStep(itemsContainer);
-  } else {
-    // Standard accordion section (basics, github)
-    section.items.forEach(item => {
-      const el = renderStage1Item(item, section.id);
-      if (el) itemsContainer.appendChild(el);
-    });
+    html += '</div>';
+    html += `<div class="s1-stage-name">${stageNames[currentStageNum - 1] || ''}</div>`;
+    stageBar.innerHTML = html;
   }
 
-  // Navigation buttons
-  nav.innerHTML = '';
-  const prevBtn = document.createElement('button');
-  prevBtn.className = 'btn';
-  prevBtn.textContent = '← Previous';
-  prevBtn.disabled = s1WizardStep === 0;
-  prevBtn.onclick = () => {
-    saveStage1Inputs();
-    s1WizardStep--;
-    renderWizardStep();
-  };
+  // Question card
+  const card = document.getElementById('s1-question-card');
+  if (!card) return;
 
-  const nextBtn = document.createElement('button');
-  nextBtn.className = 'btn btn-primary';
-  nextBtn.textContent = s1WizardStep === s1WizardSections.length - 1 ? 'Finish' : 'Next →';
-  nextBtn.onclick = () => {
-    saveStage1Inputs();
-    if (s1WizardStep < s1WizardSections.length - 1) {
-      s1WizardStep++;
-      renderWizardStep();
-    } else {
-      showToast('PRD form complete — scroll down for D5 and D4', 'success');
+  const val = sd.inputs[q.id] || '';
+  let bodyHtml = '';
+
+  if (q.type === 'statement') {
+    bodyHtml = `<div class="s1-statement"><div class="s1-statement-icon">📌</div><div>${escHtml(q.desc)}</div></div>`;
+  } else if (q.type === 'function_count') {
+    bodyHtml = `
+      <div class="s1-q-label"><span class="s1-item-id">${escHtml(q.id)}</span> ${escHtml(q.desc)}</div>
+      <div class="s1-item-hint">${escHtml(q.hint)}</div>
+      <input type="number" class="s1-input s1-big-input" min="1" max="${q.meta.maxCount || 10}" value="${val || ''}" placeholder="1-10"
+        onchange="onFunctionCountChange(this.value); buildS1FlowContext(); s1FlatQuestions = buildFlatQuestionList(); renderSingleQuestion();" />
+    `;
+  } else if (q.type === 'function_name') {
+    bodyHtml = `
+      <div class="s1-q-label"><span class="s1-item-id">${escHtml(q.id)}</span> ${escHtml(q.desc)}</div>
+      <div class="s1-item-hint">${escHtml(q.hint)}</div>
+      <input class="s1-input s1-big-input" value="${escHtml(val)}" placeholder="Enter function name…"
+        onchange="onFunctionNameChange(${q.meta.idx}, this.value)" />
+    `;
+  } else if (q.type === 'function_summary') {
+    bodyHtml = `
+      <div class="s1-q-label"><span class="s1-item-id">${escHtml(q.id)}</span> ${escHtml(q.desc)}</div>
+      <div class="s1-item-hint">${escHtml(q.hint)}</div>
+      <textarea class="s1-textarea s1-big-input" placeholder="Enter function summary…"
+        onchange="onFunctionSummaryChange(${q.meta.idx}, this.value)">${escHtml(val)}</textarea>
+    `;
+  } else if (q.type === 'function_scoping') {
+    const selected = s1FlowContext.scoping[q.meta.idx] || [];
+    const activeOptions = getActiveScopingOptions();
+    const optsToShow = activeOptions.length > 0 ? activeOptions : ['(Complete Infrastructure section first)'];
+    let checks = optsToShow.map(opt => {
+      const disabled = opt.startsWith('(') ? 'disabled' : '';
+      const v = opt.startsWith('(') ? '' : opt;
+      const checked = selected.includes(v) ? 'checked' : '';
+      const opacity = opt.startsWith('(') ? 'opacity:0.5;' : '';
+      return `<label class="s1-checkbox-opt" style="font-size:14px;${opacity}">
+        <input type="checkbox" data-stage1-type="scoping" data-stage1-id="${q.meta.idx}" value="${escHtml(v)}" ${checked} ${disabled}
+          onchange="onFunctionScopingChange(${q.meta.idx}, '${escHtml(v)}', this.checked)" />
+        ${escHtml(opt)}
+      </label>`;
+    }).join('');
+    bodyHtml = `
+      <div class="s1-q-label"><span class="s1-item-id">${escHtml(q.id)}</span> ${escHtml(q.desc)}</div>
+      <div class="s1-item-hint">${escHtml(q.hint)}</div>
+      <div class="s1-checkbox-group s1-big-input">${checks}</div>
+    `;
+  } else if (q.type === 'yesno') {
+    const isYes = val === 'yes';
+    const isNo = val === 'no';
+    let followUpHtml = '';
+    if (isYes && q.meta.followUpYes) {
+      followUpHtml = '<div class="s1-followups">';
+      q.meta.followUpYes.forEach(fu => {
+        const fuVal = sd.inputs[fu.id] || '';
+        followUpHtml += `
+          <div class="s1-followup-item">
+            <div class="s1-item-label" style="font-size:12px;padding-left:24px;">
+              <span class="s1-item-id">${escHtml(fu.id)}</span> ${escHtml(fu.desc)}
+            </div>
+            <textarea class="s1-textarea s1-big-input" style="margin-left:24px;width:calc(100% - 24px);" data-stage1-id="${fu.id}" placeholder="Describe…">${escHtml(fuVal)}</textarea>
+          </div>`;
+      });
+      followUpHtml += '</div>';
     }
-  };
+    if (isYes && q.meta.infraFollowUps) {
+      followUpHtml = '<div class="s1-followups">';
+      q.meta.infraFollowUps.forEach(fu => {
+        const fuVal = sd.inputs[fu.id] || '';
+        followUpHtml += `
+          <div class="s1-followup-item">
+            <div class="s1-item-label" style="font-size:12px;padding-left:24px;">
+              <span class="s1-item-id">${escHtml(fu.id)}</span> ${escHtml(fu.desc)}
+            </div>
+            <div class="s1-item-hint" style="padding-left:24px;font-size:11px;">${escHtml(fu.hint)}</div>
+            <input class="s1-input s1-big-input" style="margin-left:24px;width:calc(100% - 24px);" data-stage1-id="${fu.id}" value="${escHtml(fuVal)}" placeholder="Enter answer…" />
+          </div>`;
+      });
+      followUpHtml += '</div>';
+    }
+    bodyHtml = `
+      <div class="s1-q-label"><span class="s1-item-id">${escHtml(q.id)}</span> ${escHtml(q.desc)}</div>
+      <div class="s1-item-hint">${escHtml(q.hint)}</div>
+      <div class="s1-yesno-group">
+        <label class="s1-yesno-opt ${isYes ? 'selected' : ''}">
+          <input type="radio" name="radio-${q.id}" value="yes" data-stage1-id="${q.id}" data-stage1-type="yesno" ${isYes ? 'checked' : ''}
+            onchange="onYesNoChange('${q.id}', 'yes', ${JSON.stringify(q.meta.followUpYes || q.meta.infraFollowUps || null)}, this); renderSingleQuestion();" /> ✅ Yes
+        </label>
+        <label class="s1-yesno-opt ${isNo ? 'selected' : ''}">
+          <input type="radio" name="radio-${q.id}" value="no" data-stage1-id="${q.id}" data-stage1-type="yesno" ${isNo ? 'checked' : ''}
+            onchange="onYesNoChange('${q.id}', 'no', null, this); renderSingleQuestion();" /> ❌ No
+        </label>
+      </div>
+      ${followUpHtml}
+    `;
+  } else if (q.type === 'manual') {
+    bodyHtml = `
+      <div class="s1-q-label"><span class="s1-item-id">${escHtml(q.id)}</span> ${escHtml(q.desc)}</div>
+      <div class="s1-item-hint">${escHtml(q.hint)}</div>
+      <textarea class="s1-textarea s1-big-input" data-stage1-id="${q.id}" placeholder="Enter your answer…"
+        onchange="onStage1InputChange('${q.id}', this.value)">${escHtml(val)}</textarea>
+    `;
+  } else if (q.type === 'checkboxes') {
+    const selected = val || [];
+    const optionsHtml = q.meta.options.map(opt => `
+      <label class="s1-checkbox-opt" style="font-size:14px;">
+        <input type="checkbox" data-stage1-id="${q.id}" data-stage1-type="checkbox-group" value="${escHtml(opt)}" ${selected.includes(opt) ? 'checked' : ''}
+          onchange="onStage1CheckboxChange('${q.id}', '${escHtml(opt)}', this.checked)" />
+        ${escHtml(opt)}
+      </label>
+    `).join('');
+    bodyHtml = `
+      <div class="s1-q-label"><span class="s1-item-id">${escHtml(q.id)}</span> ${escHtml(q.desc)}</div>
+      <div class="s1-item-hint">${escHtml(q.hint)}</div>
+      <div class="s1-checkbox-group s1-big-input">${optionsHtml}</div>
+    `;
+  }
 
-  nav.appendChild(prevBtn);
-  nav.appendChild(nextBtn);
+  card.className = 's1-question-card';
+  card.innerHTML = bodyHtml;
+
+  // Navigation
+  const nav = document.getElementById('s1-nav');
+  if (nav) {
+    const canPrev = s1CurrentQuestion > 0;
+    const canNext = s1CurrentQuestion < s1FlatQuestions.length - 1;
+    nav.innerHTML = `
+      <button class="btn s1-nav-btn" ${canPrev ? '' : 'disabled'} onclick="s1CurrentQuestion--; saveStage1Inputs(); renderSingleQuestion();">← Back</button>
+      <div class="s1-nav-counter">Question ${s1CurrentQuestion + 1} of ${s1FlatQuestions.length}</div>
+      <button class="btn btn-primary s1-nav-btn" ${canNext ? '' : 'disabled'} onclick="saveStage1Inputs(); s1CurrentQuestion++; buildS1FlowContext(); s1FlatQuestions = buildFlatQuestionList(); renderSingleQuestion();">Forward →</button>
+    `;
+  }
 }
 
 /** Render functions wizard step with dynamic sub-sections */
