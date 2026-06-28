@@ -503,7 +503,7 @@ function renderSingleQuestion() {
     const canPrev = s1CurrentQuestion > 0;
     const canNext = s1CurrentQuestion < s1FlatQuestions.length - 1;
     nav.innerHTML = `
-      <button class="btn s1-nav-btn" ${canPrev ? '' : 'disabled'} onclick="s1CurrentQuestion--; saveStage1Inputs(); renderSingleQuestion();">← Back</button>
+      <button class="btn s1-nav-btn" ${canPrev ? '' : 'disabled'} onclick="saveStage1Inputs(); s1CurrentQuestion--; renderSingleQuestion();">← Back</button>
       <div class="s1-nav-counter">Question ${s1CurrentQuestion + 1} of ${s1FlatQuestions.length}</div>
       <button class="btn btn-primary s1-nav-btn" ${canNext ? '' : 'disabled'} onclick="saveStage1Inputs(); s1CurrentQuestion++; buildS1FlowContext(); s1FlatQuestions = buildFlatQuestionList(); renderSingleQuestion();">Forward →</button>
     `;
