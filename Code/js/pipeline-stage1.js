@@ -393,14 +393,14 @@ function renderSingleQuestion() {
     bodyHtml = `
       <div class="s1-q-label"><span class="s1-item-id">${escHtml(q.id)}</span> ${escHtml(q.desc)}</div>
       <div class="s1-item-hint">${escHtml(q.hint)}</div>
-      <input class="s1-input s1-big-input" value="${escHtml(val)}" placeholder="Enter function name…"
+      <input class="s1-input s1-big-input" value="${escHtml(val)}" placeholder="Enter function name…" data-stage1-fn="name" data-idx="${q.meta.idx}"
         onchange="onFunctionNameChange(${q.meta.idx}, this.value)" />
     `;
   } else if (q.type === 'function_summary') {
     bodyHtml = `
       <div class="s1-q-label"><span class="s1-item-id">${escHtml(q.id)}</span> ${escHtml(q.desc)}</div>
       <div class="s1-item-hint">${escHtml(q.hint)}</div>
-      <textarea class="s1-textarea s1-big-input" placeholder="Enter function summary…"
+      <textarea class="s1-textarea s1-big-input" placeholder="Enter function summary…" data-stage1-fn="summary" data-idx="${q.meta.idx}"
         onchange="onFunctionSummaryChange(${q.meta.idx}, this.value)">${escHtml(val)}</textarea>
     `;
   } else if (q.type === 'function_scoping') {
@@ -1080,6 +1080,16 @@ function onFunctionNameChange(idx, val) {
   const tag = getManualTag('D1.4.2.' + (idx + 1));
   logTag('section_functions', 'D1.4.2.' + (idx + 1), tag, val, 'Function name');
   updateTagBadge('D1.4.2.' + (idx + 1), 'section_functions', val);
+  saveToStorage();
+}
+
+function onFunctionSummaryChange(idx, val) {
+  const sd = stageData[1];
+  sd.functionSummaries[idx] = val;
+  const tag = getManualTag('D2.1.' + (idx + 1));
+  logTag('section_functions', 'D2.1.' + (idx + 1), tag, val, 'Function summary');
+  updateTagBadge('D2.1.' + (idx + 1), 'section_functions', val);
+  saveToStorage();
 }
 
 function onFunctionScopingChange(idx, option, checked) {
@@ -1090,6 +1100,7 @@ function onFunctionScopingChange(idx, option, checked) {
   } else if (!checked) {
     sd.functionScoping[idx] = sd.functionScoping[idx].filter(v => v !== option);
   }
+  saveToStorage();
 }
 
 function onStage1InputChange(id, val) {

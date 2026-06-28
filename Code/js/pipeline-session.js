@@ -109,6 +109,7 @@ async function saveSessionToServer() {
       method: 'PUT',
       body: JSON.stringify(data)
     });
+    if (typeof markClean === 'function') markClean();
   } catch (e) {
     console.warn('Failed to save to server:', e.message);
   }

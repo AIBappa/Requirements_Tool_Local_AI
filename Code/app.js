@@ -76,33 +76,68 @@ function showExportsPath() {
   const el = document.getElementById('exports-path');
   if (el) el.textContent = '📦 Server folder: saved_exports';
 }
+// Track unsaved server changes for the "please save your changes" indicator
+let _hasUnsavedServerChanges = false;
+
+// Mark state as dirty whenever something changes (set by various save handlers)
+function markDirty() {
+  _hasUnsavedServerChanges = true;
+  updateUnsavedIndicator();
+}
+
+function markClean() {
+  _hasUnsavedServerChanges = false;
+  updateUnsavedIndicator();
+}
+
+function hasUnsavedServerChanges() {
+  // True if there are manual inputs that haven't been persisted to server session
+  if (_hasUnsavedServerChanges) return true;
+  return PIPELINE.some(s => {
+    const sd = stageData[s.id];
+    if (!sd) return false;
+    return Object.values(sd.manualInputs || {}).some(v => v && v.trim());
+  });
+}
+
+function updateUnsavedIndicator() {
+  const el = document.getElementById('unsaved-warning');
+  if (!el) return;
+  if (hasUnsavedServerChanges()) {
+    el.textContent = '⚠️ You have unsaved changes — please save your work before leaving.';
+    el.style.display = 'block';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+showExportsPath();
 window.addEventListener('beforeunload', function(e) {
   try { saveToStorage(); } catch(err) {}
   try { if (typeof saveCurrentInputs === 'function') saveCurrentInputs(); } catch(err) {}
   try { if (typeof saveSessionToServer === 'function') saveSessionToServer(); } catch(err) {}
-  // Show browser's native confirmation dialog
-  e.preventDefault();
-  e.returnValue = '';
-  return '';
+  // Only show browser's native confirmation dialog if there are unsaved server changes
+  if (hasUnsavedServerChanges()) {
+    e.preventDefault();
+    e.returnValue = '';
+    return '';
+  }
 });
 const loaded = loadFromStorage();
-if (window.location.protocol !== 'file:') {
+if (loaded) {
+  // Restore from localStorage (works for both file:// and http://)
+  const pipelineView = document.getElementById('pipeline-view');
   const sessionPage = document.getElementById('session-page');
-  const pipelineView = document.getElementById('pipeline-view');
-  if (sessionPage) sessionPage.classList.remove('hidden');
-  if (pipelineView) pipelineView.classList.add('hidden');
-  loadSessions();
-} else if (loaded) {
-  const pipelineView = document.getElementById('pipeline-view');
   if (pipelineView) pipelineView.classList.remove('hidden');
-  const sessionPage = document.getElementById('session-page');
   if (sessionPage) sessionPage.classList.add('hidden');
   buildSidebar();
   renderStage();
   updateSetupIndicator();
   showToast('Session restored from local storage ✓');
+  markClean();
 } else {
-  autoSaveAndMaybeRestore().then(() => {
+  // Try auto-restore from server
+  autoSaveAndMaybeRestore().then(async () => {
     const pipelineView = document.getElementById('pipeline-view');
     const sessionPage = document.getElementById('session-page');
     const hasData = PIPELINE.some(s => stageData[s.id] && Object.values(stageData[s.id].manualInputs || {}).some(v => v && v.trim()));
@@ -113,10 +148,25 @@ if (window.location.protocol !== 'file:') {
       renderStage();
       updateSetupIndicator();
       showToast('Session restored from server ✓');
+      markClean();
     } else {
+      // Check if there's a last session to auto-open
+      const lastId = localStorage.getItem('pipeline-last-session');
+      if (lastId && typeof openSession === 'function' && currentSessionId !== lastId) {
+        try {
+          await openSession(lastId);
+          showToast('Auto-resumed last session ✓');
+          markClean();
+          return;
+        } catch (e) {
+          console.warn('Could not auto-open last session:', e);
+        }
+      }
+      // Show session page as fallback
       if (pipelineView) pipelineView.classList.add('hidden');
       if (sessionPage) sessionPage.classList.remove('hidden');
       loadSessions();
+      markClean();
     }
   });
   showExportsPath();
