@@ -374,7 +374,7 @@ function renderSingleQuestion() {
   const card = document.getElementById('s1-question-card');
   if (!card) return;
 
-  const val = sd.inputs[q.id] || '';
+  const val = q.type === 'function_count' ? (sd.functionCount || '') : (sd.inputs[q.id] || '');
   let bodyHtml = '';
 
   if (q.type === 'statement') {
@@ -1005,6 +1005,7 @@ function onFunctionCountChange(val) {
   const sd = stageData[1];
   const count = Math.min(Math.max(parseInt(val) || 0, 0), 10);
   sd.functionCount = count;
+  sd.inputs['D1.4.1'] = String(count);
   while (sd.functionNames.length < count) sd.functionNames.push('');
   while (sd.functionSummaries.length < count) sd.functionSummaries.push('');
   while (sd.functionScoping.length < count) sd.functionScoping.push([]);
