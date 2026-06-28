@@ -171,14 +171,12 @@ function saveStage1Inputs() {
   // Save function count
   const fc = document.getElementById('s1-func-count');
   if (fc) sd.functionCount = parseInt(fc.value) || 0;
-  // Save function names
-  sd.functionNames = [];
+  // Save function names (don't reset — preserve existing values if DOM elements aren't visible)
   document.querySelectorAll('[data-stage1-fn="name"]').forEach(el => {
     const idx = parseInt(el.dataset.idx);
     sd.functionNames[idx] = el.value;
   });
-  // Save function summaries
-  sd.functionSummaries = [];
+  // Save function summaries (don't reset — preserve existing values if DOM elements aren't visible)
   document.querySelectorAll('[data-stage1-fn="summary"]').forEach(el => {
     const idx = parseInt(el.dataset.idx);
     sd.functionSummaries[idx] = el.value;
