@@ -122,7 +122,6 @@ function saveToStorage() {
       },
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    if (typeof markDirty === 'function') markDirty();
   } catch(e) {
     console.warn('localStorage save failed:', e.message);
   }
