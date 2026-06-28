@@ -87,7 +87,6 @@ window.addEventListener('beforeunload', function(e) {
   return '';
 });
 const loaded = loadFromStorage();
-const loaded = loadFromStorage();
 if (loaded) {
   const pipelineView = document.getElementById('pipeline-view');
   const sessionPage = document.getElementById('session-page');
