@@ -374,7 +374,10 @@ function renderSingleQuestion() {
   const card = document.getElementById('s1-question-card');
   if (!card) return;
 
-  const val = q.type === 'function_count' ? (sd.functionCount || '') : (sd.inputs[q.id] || '');
+  const val = q.type === 'function_count' ? (sd.functionCount || '') :
+              q.type === 'function_name' ? (sd.functionNames ? (sd.functionNames[q.meta.idx] || '') : '') :
+              q.type === 'function_summary' ? (sd.functionSummaries ? (sd.functionSummaries[q.meta.idx] || '') : '') :
+              (sd.inputs[q.id] || '');
   let bodyHtml = '';
 
   if (q.type === 'statement') {
