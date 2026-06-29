@@ -167,7 +167,7 @@ const STAGE1_EXTERNAL_DYNAMIC = [
 
 // Scoping options for D2.2.x
 const SCOPING_OPTIONS = [
-  'Public Webapp', 'Private Webapp', 'Public BFF', 'Private BFF',
+  'Public Webapp', 'Private Webapp', 'Public Android App', 'Private Android App', 'Public BFF', 'Private BFF',
   'Permanent Database', 'In-memory Database', 'External Links'
 ];
 

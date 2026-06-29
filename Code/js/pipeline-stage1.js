@@ -13,6 +13,8 @@ function getActiveScopingOptions() {
   const options = [];
   if (sd.inputs['D1.6.1.1'] === 'yes') options.push('Public Webapp');
   if (sd.inputs['D1.6.2.1'] === 'yes') options.push('Private Webapp');
+  if (sd.inputs['D1.6.3.1'] === 'yes') options.push('Public Android App');
+  if (sd.inputs['D1.6.4.1'] === 'yes') options.push('Private Android App');
   if (sd.inputs['D1.6.5.1'] === 'yes') options.push('Public BFF');
   if (sd.inputs['D1.6.6.1'] === 'yes') options.push('Private BFF');
   if (sd.inputs['D1.6.7.1'] === 'yes') options.push('Permanent Database');
