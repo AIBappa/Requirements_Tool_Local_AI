@@ -504,10 +504,47 @@ function renderSingleQuestion() {
     const canNext = s1CurrentQuestion < s1FlatQuestions.length - 1;
     nav.innerHTML = `
       <button class="btn s1-nav-btn" ${canPrev ? '' : 'disabled'} onclick="saveStage1Inputs(); s1CurrentQuestion--; renderSingleQuestion();">← Back</button>
-      <div class="s1-nav-counter">Question ${s1CurrentQuestion + 1} of ${s1FlatQuestions.length}</div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input type="number" class="s1-nav-jump-input" id="s1-jump-input" value="${s1CurrentQuestion + 1}" min="1" max="${s1FlatQuestions.length}" placeholder="#" />
+        <button class="btn s1-nav-jump-btn" onclick="s1JumpToQuestion()">Go</button>
+      </div>
       <button class="btn btn-primary s1-nav-btn" ${canNext ? '' : 'disabled'} onclick="saveStage1Inputs(); s1CurrentQuestion++; buildS1FlowContext(); s1FlatQuestions = buildFlatQuestionList(); renderSingleQuestion();">Forward →</button>
     `;
+    // Add Enter key support
+    const jumpInput = document.getElementById('s1-jump-input');
+    if (jumpInput) {
+      jumpInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          s1JumpToQuestion();
+        }
+      });
+    }
   }
+}
+
+function s1JumpToQuestion() {
+  const jumpInput = document.getElementById('s1-jump-input');
+  if (!jumpInput) return;
+  
+  const target = parseInt(jumpInput.value) - 1; // Convert to 0-based
+  const total = s1FlatQuestions.length;
+  
+  // Validate and clamp
+  if (isNaN(target) || target < 0) {
+    jumpInput.value = s1CurrentQuestion + 1;
+    return;
+  }
+  
+  if (target >= total) {
+    jumpInput.value = total;
+    s1CurrentQuestion = total - 1;
+  } else {
+    s1CurrentQuestion = target;
+    jumpInput.value = target + 1;
+  }
+  
+  saveStage1Inputs();
+  renderSingleQuestion();
 }
 
 /** Render functions wizard step with dynamic sub-sections */
