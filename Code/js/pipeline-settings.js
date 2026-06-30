@@ -250,6 +250,30 @@ function exportPDF() {
     jsPDFScript.onload = function() {
       const stage = PIPELINE[currentStage - 1];
       const contentEl = document.getElementById('content');
+      
+      // Collect all collapsible/hidden elements and their original states
+      const hiddenElements = [];
+      const selectors = [
+        '.s1-accordion-body',
+        '.frs-hist-body',
+        '.review-notes',
+        '[style*="display: none"]',
+        '[style*="display:none"]',
+        '.hidden'
+      ];
+      
+      document.querySelectorAll(selectors.join(', ')).forEach(el => {
+        if (el.closest('#content') || el.closest('#content *')) {
+          hiddenElements.push({
+            el: el,
+            originalDisplay: el.style.display,
+            originalClass: el.className
+          });
+          el.style.display = 'block';
+          el.classList.remove('hidden');
+        }
+      });
+
       const clone = contentEl.cloneNode(true);
       clone.style.width = '800px';
       clone.style.padding = '24px';
@@ -257,6 +281,7 @@ function exportPDF() {
       clone.style.position = 'absolute';
       clone.style.left = '-9999px';
       clone.style.top = '0';
+      clone.style.filter = 'grayscale(100%) contrast(1.1)';
       document.body.appendChild(clone);
 
       html2canvas(clone, { scale: 2, useCORS: true }).then(canvas => {
@@ -282,9 +307,35 @@ function exportPDF() {
 
         pdf.save(`stage-${stage.id}-${stage.name.replace(/[^a-zA-Z0-9]/g,'-')}.pdf`);
         document.body.removeChild(clone);
+        
+        // Restore original hidden state of elements
+        hiddenElements.forEach(item => {
+          if (item.originalDisplay) {
+            item.el.style.display = item.originalDisplay;
+          } else {
+            item.el.style.display = '';
+          }
+          if (item.originalClass) {
+            item.el.className = item.originalClass;
+          }
+        });
+        
         showToast('PDF exported ✓');
       }).catch(err => {
         document.body.removeChild(clone);
+        
+        // Restore original hidden state even on error
+        hiddenElements.forEach(item => {
+          if (item.originalDisplay) {
+            item.el.style.display = item.originalDisplay;
+          } else {
+            item.el.style.display = '';
+          }
+          if (item.originalClass) {
+            item.el.className = item.originalClass;
+          }
+        });
+        
         showToast('PDF export failed: ' + err.message);
       });
     };
