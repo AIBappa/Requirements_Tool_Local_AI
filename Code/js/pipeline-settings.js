@@ -351,12 +351,16 @@ async function exportPDF() {
         }
       }
 
-      for (const sectionEl of sections) {
-        await renderSectionToPdf(sectionEl);
-      }
+      try {
+        for (const sectionEl of sections) {
+          await renderSectionToPdf(sectionEl);
+        }
 
-      pdf.save(`stage-${stage.id}-${stage.name.replace(/[^a-zA-Z0-9]/g,'-')}.pdf`);
-
+        pdf.save(`stage-${stage.id}-${stage.name.replace(/[^a-zA-Z0-9]/g,'-')}.pdf`);
+        showToast('PDF exported ✓');
+      } catch (err) {
+        showToast('PDF export failed: ' + err.message);
+      } finally {
         // Restore textareas
         textareaReplacements.forEach(({ original, replacement }) => {
           original.style.display = '';
@@ -380,35 +384,7 @@ async function exportPDF() {
           updateViewModeButton();
           renderStage();
         }
-
-        showToast('PDF exported ✓');
-      }).catch(err => {
-        // Restore textareas even on error
-        textareaReplacements.forEach(({ original, replacement }) => {
-          original.style.display = '';
-          if (replacement.parentNode) replacement.parentNode.removeChild(replacement);
-        });
-
-        hiddenElements.forEach(item => {
-          if (item.originalDisplay) {
-            item.el.style.display = item.originalDisplay;
-          } else {
-            item.el.style.display = '';
-          }
-          if (item.originalClass) {
-            item.el.className = item.originalClass;
-          }
-        });
-
-        if (savedViewMode !== null) {
-          globalViewMode = savedViewMode;
-          if (typeof s1ViewMode !== 'undefined') s1ViewMode = savedViewMode;
-          updateViewModeButton();
-          renderStage();
-        }
-
-        showToast('PDF export failed: ' + err.message);
-      });
+      }
     };
     document.head.appendChild(jsPDFScript);
   };
