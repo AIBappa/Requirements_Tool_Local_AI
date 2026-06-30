@@ -58,7 +58,29 @@ ollama pull phi3:mini</div>
         <input class="setup-input" id="ollama-url" type="text" value="http://localhost:11434" placeholder="http://localhost:11434" />
         <div style="display:flex;gap:10px;align-items:center;margin-top:12px;">
           <button class="btn btn-primary" onclick="testOllama()" style="font-size:12px;padding:7px 14px;">Test Ollama connection</button>
+          <span id="local-status-dot" style="font-size:14px;">⚫</span>
           <span id="ollama-test-result" style="font-size:12px;color:var(--text-3);">Not tested yet</span>
+        </div>
+      </div>
+      <div class="setup-section">
+        <button class="btn btn-ghost" onclick="toggleAdvanced('local')" style="font-size:12px;padding:5px 12px;">⚙️ Advanced Parameters</button>
+        <div id="advanced-local" class="advanced-panel">
+          <div class="adv-row">
+            <label class="adv-label">max_tokens</label>
+            <input class="adv-input" id="local-adv-max-tokens" type="number" value="2000" min="1" max="131072" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">temperature</label>
+            <input class="adv-input" id="local-adv-temperature" type="number" value="0.70" min="0" max="2" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">top_p</label>
+            <input class="adv-input" id="local-adv-top-p" type="number" value="1.00" min="0" max="1" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">stream</label>
+            <input class="adv-checkbox" id="local-adv-stream" type="checkbox" />
+          </div>
         </div>
       </div>
     </div>
@@ -75,15 +97,42 @@ ollama pull phi3:mini</div>
       </div>
       <div class="setup-section">
         <h3>Model</h3>
-        <select class="setup-input" id="cloud-model-select" style="font-family:var(--mono);">
+        <input class="setup-input" id="cloud-model-input" type="text" list="cloud-model-list" placeholder="claude-sonnet-4-6" style="font-family:var(--mono);" />
+        <datalist id="cloud-model-list">
           <option value="claude-sonnet-4-6">claude-sonnet-4-6 (recommended)</option>
           <option value="claude-opus-4-6">claude-opus-4-6 (most capable)</option>
           <option value="claude-haiku-4-5-20251001">claude-haiku-4-5 (fastest)</option>
-        </select>
+        </datalist>
       </div>
       <div class="setup-section">
         <button class="btn btn-primary" onclick="testCloudAPI()" style="font-size:12px;padding:7px 14px;">Test API Key</button>
-        <span id="cloud-test-result" style="font-size:12px;color:var(--text-3);margin-left:10px;">Not tested yet</span>
+        <span id="cloud-status-dot" style="font-size:14px;">⚫</span>
+        <span id="cloud-test-result" style="font-size:12px;color:var(--text-3);margin-left:4px;">Not tested yet</span>
+      </div>
+      <div class="setup-section">
+        <button class="btn btn-ghost" onclick="toggleAdvanced('cloud')" style="font-size:12px;padding:5px 12px;">⚙️ Advanced Parameters</button>
+        <div id="advanced-cloud" class="advanced-panel">
+          <div class="adv-row">
+            <label class="adv-label">max_tokens</label>
+            <input class="adv-input" id="cloud-adv-max-tokens" type="number" value="2000" min="1" max="131072" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">temperature</label>
+            <input class="adv-input" id="cloud-adv-temperature" type="number" value="0.70" min="0" max="2" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">top_p</label>
+            <input class="adv-input" id="cloud-adv-top-p" type="number" value="1.00" min="0" max="1" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">top_k</label>
+            <input class="adv-input" id="cloud-adv-top-k" type="number" value="0" min="0" max="500" step="1" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">stream</label>
+            <input class="adv-checkbox" id="cloud-adv-stream" type="checkbox" />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -99,16 +148,48 @@ ollama pull phi3:mini</div>
       </div>
       <div class="setup-section">
         <h3>Model</h3>
-        <select class="setup-input" id="openai-model-select" style="font-family:var(--mono);">
+        <input class="setup-input" id="openai-model-input" type="text" list="openai-model-list" placeholder="gpt-4o" style="font-family:var(--mono);" />
+        <datalist id="openai-model-list">
           <option value="gpt-4o">gpt-4o (recommended)</option>
           <option value="gpt-4o-mini">gpt-4o-mini (faster)</option>
           <option value="gpt-4-turbo">gpt-4-turbo</option>
           <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
-        </select>
+        </datalist>
       </div>
       <div class="setup-section">
         <button class="btn btn-primary" onclick="testOpenAI()" style="font-size:12px;padding:7px 14px;">Test API Key</button>
-        <span id="openai-test-result" style="font-size:12px;color:var(--text-3);margin-left:10px;">Not tested yet</span>
+        <span id="openai-status-dot" style="font-size:14px;">⚫</span>
+        <span id="openai-test-result" style="font-size:12px;color:var(--text-3);margin-left:4px;">Not tested yet</span>
+      </div>
+      <div class="setup-section">
+        <button class="btn btn-ghost" onclick="toggleAdvanced('openai')" style="font-size:12px;padding:5px 12px;">⚙️ Advanced Parameters</button>
+        <div id="advanced-openai" class="advanced-panel">
+          <div class="adv-row">
+            <label class="adv-label">max_tokens</label>
+            <input class="adv-input" id="openai-adv-max-tokens" type="number" value="2000" min="1" max="131072" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">temperature</label>
+            <input class="adv-input" id="openai-adv-temperature" type="number" value="0.70" min="0" max="2" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">top_p</label>
+            <input class="adv-input" id="openai-adv-top-p" type="number" value="1.00" min="0" max="1" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">reasoning_effort</label>
+            <select class="adv-input" id="openai-adv-reasoning-effort">
+              <option value="">(not set)</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+            </select>
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">stream</label>
+            <input class="adv-checkbox" id="openai-adv-stream" type="checkbox" />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -124,16 +205,43 @@ ollama pull phi3:mini</div>
       </div>
       <div class="setup-section">
         <h3>Model</h3>
-        <select class="setup-input" id="gemini-model-select" style="font-family:var(--mono);">
+        <input class="setup-input" id="gemini-model-input" type="text" list="gemini-model-list" placeholder="gemini-2.0-flash" style="font-family:var(--mono);" />
+        <datalist id="gemini-model-list">
           <option value="gemini-2.0-flash">gemini-2.0-flash (recommended)</option>
           <option value="gemini-2.0-pro">gemini-2.0-pro (most capable)</option>
           <option value="gemini-1.5-flash">gemini-1.5-flash (fastest)</option>
           <option value="gemini-1.5-pro">gemini-1.5-pro</option>
-        </select>
+        </datalist>
       </div>
       <div class="setup-section">
         <button class="btn btn-primary" onclick="testGemini()" style="font-size:12px;padding:7px 14px;">Test API Key</button>
-        <span id="gemini-test-result" style="font-size:12px;color:var(--text-3);margin-left:10px;">Not tested yet</span>
+        <span id="gemini-status-dot" style="font-size:14px;">⚫</span>
+        <span id="gemini-test-result" style="font-size:12px;color:var(--text-3);margin-left:4px;">Not tested yet</span>
+      </div>
+      <div class="setup-section">
+        <button class="btn btn-ghost" onclick="toggleAdvanced('gemini')" style="font-size:12px;padding:5px 12px;">⚙️ Advanced Parameters</button>
+        <div id="advanced-gemini" class="advanced-panel">
+          <div class="adv-row">
+            <label class="adv-label">max_tokens</label>
+            <input class="adv-input" id="gemini-adv-max-tokens" type="number" value="2000" min="1" max="131072" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">temperature</label>
+            <input class="adv-input" id="gemini-adv-temperature" type="number" value="0.70" min="0" max="2" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">top_p</label>
+            <input class="adv-input" id="gemini-adv-top-p" type="number" value="1.00" min="0" max="1" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">top_k</label>
+            <input class="adv-input" id="gemini-adv-top-k" type="number" value="0" min="0" max="500" step="1" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">stream</label>
+            <input class="adv-checkbox" id="gemini-adv-stream" type="checkbox" />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -148,15 +256,47 @@ ollama pull phi3:mini</div>
         <label class="setup-label" style="margin-top:12px;">Deployment name</label>
         <input class="setup-input" id="azure-deployment-input" type="text" placeholder="gpt-4o" />
         <label class="setup-label" style="margin-top:12px;">Model (for reference)</label>
-        <select class="setup-input" id="azure-model-select" style="font-family:var(--mono);">
+        <input class="setup-input" id="azure-model-input" type="text" list="azure-model-list" placeholder="gpt-4o" style="font-family:var(--mono);" />
+        <datalist id="azure-model-list">
           <option value="gpt-4o">gpt-4o</option>
           <option value="gpt-4o-mini">gpt-4o-mini</option>
           <option value="gpt-4-turbo">gpt-4-turbo</option>
-        </select>
+        </datalist>
       </div>
       <div class="setup-section">
         <button class="btn btn-primary" onclick="testAzure()" style="font-size:12px;padding:7px 14px;">Test Connection</button>
-        <span id="azure-test-result" style="font-size:12px;color:var(--text-3);margin-left:10px;">Not tested yet</span>
+        <span id="azure-status-dot" style="font-size:14px;">⚫</span>
+        <span id="azure-test-result" style="font-size:12px;color:var(--text-3);margin-left:4px;">Not tested yet</span>
+      </div>
+      <div class="setup-section">
+        <button class="btn btn-ghost" onclick="toggleAdvanced('azure')" style="font-size:12px;padding:5px 12px;">⚙️ Advanced Parameters</button>
+        <div id="advanced-azure" class="advanced-panel">
+          <div class="adv-row">
+            <label class="adv-label">max_tokens</label>
+            <input class="adv-input" id="azure-adv-max-tokens" type="number" value="2000" min="1" max="131072" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">temperature</label>
+            <input class="adv-input" id="azure-adv-temperature" type="number" value="0.70" min="0" max="2" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">top_p</label>
+            <input class="adv-input" id="azure-adv-top-p" type="number" value="1.00" min="0" max="1" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">reasoning_effort</label>
+            <select class="adv-input" id="azure-adv-reasoning-effort">
+              <option value="">(not set)</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+            </select>
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">stream</label>
+            <input class="adv-checkbox" id="azure-adv-stream" type="checkbox" />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -173,16 +313,48 @@ ollama pull phi3:mini</div>
       </div>
       <div class="setup-section">
         <h3>Model</h3>
-        <select class="setup-input" id="groq-model-select" style="font-family:var(--mono);">
+        <input class="setup-input" id="groq-model-input" type="text" list="groq-model-list" placeholder="llama3-70b-8192" style="font-family:var(--mono);" />
+        <datalist id="groq-model-list">
           <option value="llama3-70b-8192">llama3-70b-8192 (recommended)</option>
           <option value="llama3-8b-8192">llama3-8b-8192 (faster)</option>
           <option value="mixtral-8x7b-32768">mixtral-8x7b-32768</option>
           <option value="gemma-7b-it">gemma-7b-it</option>
-        </select>
+        </datalist>
       </div>
       <div class="setup-section">
         <button class="btn btn-primary" onclick="testGroq()" style="font-size:12px;padding:7px 14px;">Test API Key</button>
-        <span id="groq-test-result" style="font-size:12px;color:var(--text-3);margin-left:10px;">Not tested yet</span>
+        <span id="groq-status-dot" style="font-size:14px;">⚫</span>
+        <span id="groq-test-result" style="font-size:12px;color:var(--text-3);margin-left:4px;">Not tested yet</span>
+      </div>
+      <div class="setup-section">
+        <button class="btn btn-ghost" onclick="toggleAdvanced('groq')" style="font-size:12px;padding:5px 12px;">⚙️ Advanced Parameters</button>
+        <div id="advanced-groq" class="advanced-panel">
+          <div class="adv-row">
+            <label class="adv-label">max_tokens</label>
+            <input class="adv-input" id="groq-adv-max-tokens" type="number" value="2000" min="1" max="131072" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">temperature</label>
+            <input class="adv-input" id="groq-adv-temperature" type="number" value="0.70" min="0" max="2" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">top_p</label>
+            <input class="adv-input" id="groq-adv-top-p" type="number" value="1.00" min="0" max="1" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">reasoning_effort</label>
+            <select class="adv-input" id="groq-adv-reasoning-effort">
+              <option value="">(not set)</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+            </select>
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">stream</label>
+            <input class="adv-checkbox" id="groq-adv-stream" type="checkbox" />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -199,15 +371,47 @@ ollama pull phi3:mini</div>
       </div>
       <div class="setup-section">
         <h3>Model</h3>
-        <select class="setup-input" id="cerebras-model-select" style="font-family:var(--mono);">
+        <input class="setup-input" id="cerebras-model-input" type="text" list="cerebras-model-list" placeholder="llama-3.1-8b" style="font-family:var(--mono);" />
+        <datalist id="cerebras-model-list">
           <option value="llama-3.1-8b">llama-3.1-8b (recommended)</option>
           <option value="llama-3.1-70b">llama-3.1-70b</option>
           <option value="llama-3.1-405b">llama-3.1-405b</option>
-        </select>
+        </datalist>
       </div>
       <div class="setup-section">
         <button class="btn btn-primary" onclick="testCerebras()" style="font-size:12px;padding:7px 14px;">Test API Key</button>
-        <span id="cerebras-test-result" style="font-size:12px;color:var(--text-3);margin-left:10px;">Not tested yet</span>
+        <span id="cerebras-status-dot" style="font-size:14px;">⚫</span>
+        <span id="cerebras-test-result" style="font-size:12px;color:var(--text-3);margin-left:4px;">Not tested yet</span>
+      </div>
+      <div class="setup-section">
+        <button class="btn btn-ghost" onclick="toggleAdvanced('cerebras')" style="font-size:12px;padding:5px 12px;">⚙️ Advanced Parameters</button>
+        <div id="advanced-cerebras" class="advanced-panel">
+          <div class="adv-row">
+            <label class="adv-label">max_tokens</label>
+            <input class="adv-input" id="cerebras-adv-max-tokens" type="number" value="2000" min="1" max="131072" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">temperature</label>
+            <input class="adv-input" id="cerebras-adv-temperature" type="number" value="0.70" min="0" max="2" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">top_p</label>
+            <input class="adv-input" id="cerebras-adv-top-p" type="number" value="1.00" min="0" max="1" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">reasoning_effort</label>
+            <select class="adv-input" id="cerebras-adv-reasoning-effort">
+              <option value="">(not set)</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+            </select>
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">stream</label>
+            <input class="adv-checkbox" id="cerebras-adv-stream" type="checkbox" />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -224,18 +428,50 @@ ollama pull phi3:mini</div>
       </div>
       <div class="setup-section">
         <h3>Model</h3>
-        <select class="setup-input" id="openrouter-model-select" style="font-family:var(--mono);">
+        <input class="setup-input" id="openrouter-model-input" type="text" list="openrouter-model-list" placeholder="deepseek/deepseek-chat" style="font-family:var(--mono);" />
+        <datalist id="openrouter-model-list">
           <option value="deepseek/deepseek-chat">deepseek/deepseek-chat (recommended)</option>
           <option value="meta-llama/llama-3.1-8b-instruct">meta-llama/llama-3.1-8b-instruct</option>
           <option value="meta-llama/llama-3.1-70b-instruct">meta-llama/llama-3.1-70b-instruct</option>
           <option value="mistralai/mistral-7b-instruct">mistralai/mistral-7b-instruct</option>
           <option value="google/gemini-flash-1.5">google/gemini-flash-1.5</option>
           <option value="openai/gpt-4o-mini">openai/gpt-4o-mini</option>
-        </select>
+        </datalist>
       </div>
       <div class="setup-section">
         <button class="btn btn-primary" onclick="testOpenRouter()" style="font-size:12px;padding:7px 14px;">Test API Key</button>
-        <span id="openrouter-test-result" style="font-size:12px;color:var(--text-3);margin-left:10px;">Not tested yet</span>
+        <span id="openrouter-status-dot" style="font-size:14px;">⚫</span>
+        <span id="openrouter-test-result" style="font-size:12px;color:var(--text-3);margin-left:4px;">Not tested yet</span>
+      </div>
+      <div class="setup-section">
+        <button class="btn btn-ghost" onclick="toggleAdvanced('openrouter')" style="font-size:12px;padding:5px 12px;">⚙️ Advanced Parameters</button>
+        <div id="advanced-openrouter" class="advanced-panel">
+          <div class="adv-row">
+            <label class="adv-label">max_tokens</label>
+            <input class="adv-input" id="openrouter-adv-max-tokens" type="number" value="2000" min="1" max="131072" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">temperature</label>
+            <input class="adv-input" id="openrouter-adv-temperature" type="number" value="0.70" min="0" max="2" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">top_p</label>
+            <input class="adv-input" id="openrouter-adv-top-p" type="number" value="1.00" min="0" max="1" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">reasoning_effort</label>
+            <select class="adv-input" id="openrouter-adv-reasoning-effort">
+              <option value="">(not set)</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+            </select>
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">stream</label>
+            <input class="adv-checkbox" id="openrouter-adv-stream" type="checkbox" />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -252,17 +488,49 @@ ollama pull phi3:mini</div>
       </div>
       <div class="setup-section">
         <h3>Model</h3>
-        <select class="setup-input" id="nvidia-model-select" style="font-family:var(--mono);">
+        <input class="setup-input" id="nvidia-model-input" type="text" list="nvidia-model-list" placeholder="minimaxai/minimax-m3" style="font-family:var(--mono);" />
+        <datalist id="nvidia-model-list">
           <option value="minimaxai/minimax-m3">minimaxai/minimax-m3 (recommended)</option>
           <option value="meta/llama-3.1-70b-instruct">meta/llama-3.1-70b-instruct</option>
           <option value="meta/llama-3.1-8b-instruct">meta/llama-3.1-8b-instruct</option>
           <option value="google/gemma-2-9b-it">google/gemma-2-9b-it</option>
           <option value="deepseek-ai/deepseek-r1">deepseek-ai/deepseek-r1</option>
-        </select>
+        </datalist>
       </div>
       <div class="setup-section">
         <button class="btn btn-primary" onclick="testNvidia()" style="font-size:12px;padding:7px 14px;">Test API Key</button>
-        <span id="nvidia-test-result" style="font-size:12px;color:var(--text-3);margin-left:10px;">Not tested yet</span>
+        <span id="nvidia-status-dot" style="font-size:14px;">⚫</span>
+        <span id="nvidia-test-result" style="font-size:12px;color:var(--text-3);margin-left:4px;">Not tested yet</span>
+      </div>
+      <div class="setup-section">
+        <button class="btn btn-ghost" onclick="toggleAdvanced('nvidia')" style="font-size:12px;padding:5px 12px;">⚙️ Advanced Parameters</button>
+        <div id="advanced-nvidia" class="advanced-panel">
+          <div class="adv-row">
+            <label class="adv-label">max_tokens</label>
+            <input class="adv-input" id="nvidia-adv-max-tokens" type="number" value="2000" min="1" max="131072" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">temperature</label>
+            <input class="adv-input" id="nvidia-adv-temperature" type="number" value="0.70" min="0" max="2" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">top_p</label>
+            <input class="adv-input" id="nvidia-adv-top-p" type="number" value="1.00" min="0" max="1" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">reasoning_effort</label>
+            <select class="adv-input" id="nvidia-adv-reasoning-effort">
+              <option value="">(not set)</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+            </select>
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">stream</label>
+            <input class="adv-checkbox" id="nvidia-adv-stream" type="checkbox" />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -279,17 +547,49 @@ ollama pull phi3:mini</div>
       </div>
       <div class="setup-section">
         <h3>Model</h3>
-        <select class="setup-input" id="siliconflow-model-select" style="font-family:var(--mono);">
+        <input class="setup-input" id="siliconflow-model-input" type="text" list="siliconflow-model-list" placeholder="Qwen/Qwen3-32B" style="font-family:var(--mono);" />
+        <datalist id="siliconflow-model-list">
           <option value="Qwen/Qwen3-32B">Qwen/Qwen3-32B (recommended)</option>
           <option value="Qwen/Qwen2.5-Coder-32B">Qwen/Qwen2.5-Coder-32B</option>
           <option value="deepseek-ai/DeepSeek-V3">deepseek-ai/DeepSeek-V3</option>
           <option value="deepseek-ai/DeepSeek-R1">deepseek-ai/DeepSeek-R1</option>
           <option value="deepseek-ai/DeepSeek-Coder-V2">deepseek-ai/DeepSeek-Coder-V2</option>
-        </select>
+        </datalist>
       </div>
       <div class="setup-section">
         <button class="btn btn-primary" onclick="testSiliconflow()" style="font-size:12px;padding:7px 14px;">Test API Key</button>
-        <span id="siliconflow-test-result" style="font-size:12px;color:var(--text-3);margin-left:10px;">Not tested yet</span>
+        <span id="siliconflow-status-dot" style="font-size:14px;">⚫</span>
+        <span id="siliconflow-test-result" style="font-size:12px;color:var(--text-3);margin-left:4px;">Not tested yet</span>
+      </div>
+      <div class="setup-section">
+        <button class="btn btn-ghost" onclick="toggleAdvanced('siliconflow')" style="font-size:12px;padding:5px 12px;">⚙️ Advanced Parameters</button>
+        <div id="advanced-siliconflow" class="advanced-panel">
+          <div class="adv-row">
+            <label class="adv-label">max_tokens</label>
+            <input class="adv-input" id="siliconflow-adv-max-tokens" type="number" value="2000" min="1" max="131072" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">temperature</label>
+            <input class="adv-input" id="siliconflow-adv-temperature" type="number" value="0.70" min="0" max="2" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">top_p</label>
+            <input class="adv-input" id="siliconflow-adv-top-p" type="number" value="1.00" min="0" max="1" step="0.01" />
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">reasoning_effort</label>
+            <select class="adv-input" id="siliconflow-adv-reasoning-effort">
+              <option value="">(not set)</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+            </select>
+          </div>
+          <div class="adv-row">
+            <label class="adv-label">stream</label>
+            <input class="adv-checkbox" id="siliconflow-adv-stream" type="checkbox" />
+          </div>
+        </div>
       </div>
     </div>
 

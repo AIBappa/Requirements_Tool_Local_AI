@@ -1061,6 +1061,93 @@ body.assist-open #main { padding-bottom: 420px; }
   border-color: var(--accent-dark);
 }
 
+/* ─── Advanced Parameters Panel ─── */
+.advanced-panel {
+  display: none;
+  margin-top: 12px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  gap: 10px;
+  flex-direction: column;
+}
+.advanced-panel.open {
+  display: flex;
+}
+.adv-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.adv-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  font-family: var(--mono);
+  min-width: 130px;
+  flex-shrink: 0;
+}
+.adv-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.12s;
+  max-width: 200px;
+}
+.adv-input:focus {
+  border-color: var(--accent);
+}
+.adv-input[type="number"] {
+  max-width: 120px;
+}
+.adv-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+[data-theme="dark"] .advanced-panel {
+  background: var(--surface-2);
+  border-color: var(--sidebar-active);
+}
+[data-theme="dark"] .adv-input {
+  background: var(--sidebar-bg);
+  border-color: var(--sidebar-active);
+  color: #e2e0f5;
+}
+
+/* ─── Ghost button (for advanced params toggle) ─── */
+.btn-ghost {
+  background: transparent;
+  color: var(--text-3);
+  border: 1px dashed var(--border-strong);
+  font-family: var(--font);
+  transition: all 0.12s;
+}
+.btn-ghost:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--indigo-bg);
+}
+[data-theme="dark"] .btn-ghost:hover {
+  background: var(--sidebar-hover);
+}
+
+/* ─── Status dot for connection tests ─── */
+.status-dot {
+  font-size: 14px;
+  display: inline-block;
+  vertical-align: middle;
+  line-height: 1;
+}
+
 /* Responsive */
 @media (max-width: 640px) {
   .s1-header > div { flex-direction: column; align-items: flex-start !important; }

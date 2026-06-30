@@ -24,7 +24,31 @@ const CONFIG = {
   nvidiaKey: '',
   nvidiaModel: 'minimaxai/minimax-m3',
   siliconflowKey: '',
-  siliconflowModel: 'Qwen/Qwen3-32B'
+  siliconflowModel: 'Qwen/Qwen3-32B',
+  // ─── Advanced parameters per provider ───
+  localAdvanced: { maxTokens: 2000, temperature: 0.70, topP: 1.00, stream: false },
+  cloudAdvanced: { maxTokens: 2000, temperature: 0.70, topP: 1.00, topK: 0, stream: false },
+  openaiAdvanced: { maxTokens: 2000, temperature: 0.70, topP: 1.00, stream: false, reasoningEffort: '' },
+  geminiAdvanced: { maxTokens: 2000, temperature: 0.70, topP: 1.00, topK: 0, stream: false },
+  azureAdvanced: { maxTokens: 2000, temperature: 0.70, topP: 1.00, stream: false, reasoningEffort: '' },
+  groqAdvanced: { maxTokens: 2000, temperature: 0.70, topP: 1.00, stream: false, reasoningEffort: '' },
+  cerebrasAdvanced: { maxTokens: 2000, temperature: 0.70, topP: 1.00, stream: false, reasoningEffort: '' },
+  openrouterAdvanced: { maxTokens: 2000, temperature: 0.70, topP: 1.00, stream: false, reasoningEffort: '' },
+  nvidiaAdvanced: { maxTokens: 2000, temperature: 0.70, topP: 1.00, stream: false, reasoningEffort: '' },
+  siliconflowAdvanced: { maxTokens: 2000, temperature: 0.70, topP: 1.00, stream: false, reasoningEffort: '' },
+  // ─── Connection test status per provider ───
+  connectionStatus: {
+    local: { status: 'untested', message: 'Not tested yet' },
+    cloud: { status: 'untested', message: 'Not tested yet' },
+    openai: { status: 'untested', message: 'Not tested yet' },
+    gemini: { status: 'untested', message: 'Not tested yet' },
+    azure: { status: 'untested', message: 'Not tested yet' },
+    groq: { status: 'untested', message: 'Not tested yet' },
+    cerebras: { status: 'untested', message: 'Not tested yet' },
+    openrouter: { status: 'untested', message: 'Not tested yet' },
+    nvidia: { status: 'untested', message: 'Not tested yet' },
+    siliconflow: { status: 'untested', message: 'Not tested yet' }
+  }
 };
 
 const DATA_VERSION = 3;
@@ -79,6 +103,21 @@ function getProviderLabel() {
     case 'siliconflow': return '🔷 SiliconFlow';
     default: return 'Not set';
   }
+}
+
+// ─── Connection status dot helper ───
+function getStatusDot(provider) {
+  const cs = CONFIG.connectionStatus[provider];
+  if (!cs || cs.status === 'untested') return '⚫';
+  if (cs.status === 'passed') return '🟢';
+  return '🔴';
+}
+
+function getStatusColor(provider) {
+  const cs = CONFIG.connectionStatus[provider];
+  if (!cs || cs.status === 'untested') return 'var(--text-3)';
+  if (cs.status === 'passed') return 'var(--success)';
+  return 'var(--danger)';
 }
 
 // ─── Theme / Dark mode ───
@@ -136,7 +175,20 @@ function saveToStorage() {
         azureEndpoint: CONFIG.azureEndpoint,
         azureDeployment: CONFIG.azureDeployment,
         azureModel: CONFIG.azureModel,
-        nvidiaModel: CONFIG.nvidiaModel
+        nvidiaModel: CONFIG.nvidiaModel,
+        // Advanced params
+        localAdvanced: CONFIG.localAdvanced,
+        cloudAdvanced: CONFIG.cloudAdvanced,
+        openaiAdvanced: CONFIG.openaiAdvanced,
+        geminiAdvanced: CONFIG.geminiAdvanced,
+        azureAdvanced: CONFIG.azureAdvanced,
+        groqAdvanced: CONFIG.groqAdvanced,
+        cerebrasAdvanced: CONFIG.cerebrasAdvanced,
+        openrouterAdvanced: CONFIG.openrouterAdvanced,
+        nvidiaAdvanced: CONFIG.nvidiaAdvanced,
+        siliconflowAdvanced: CONFIG.siliconflowAdvanced,
+        // Connection status
+        connectionStatus: CONFIG.connectionStatus
       },
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -507,28 +559,103 @@ function openSetup() {
     'gemini-key-input': CONFIG.geminiKey,
     'azure-key-input': CONFIG.azureKey,
     'ollama-url': CONFIG.ollamaUrl,
-    'cloud-model-select': CONFIG.cloudModel,
-    'openai-model-select': CONFIG.openaiModel,
-    'gemini-model-select': CONFIG.geminiModel,
+    'cloud-model-input': CONFIG.cloudModel,
+    'openai-model-input': CONFIG.openaiModel,
+    'gemini-model-input': CONFIG.geminiModel,
     'azure-endpoint-input': CONFIG.azureEndpoint,
     'azure-deployment-input': CONFIG.azureDeployment,
-    'azure-model-select': CONFIG.azureModel,
+    'azure-model-input': CONFIG.azureModel,
     'groq-key-input': CONFIG.groqKey,
-    'groq-model-select': CONFIG.groqModel,
+    'groq-model-input': CONFIG.groqModel,
     'cerebras-key-input': CONFIG.cerebrasKey,
-    'cerebras-model-select': CONFIG.cerebrasModel,
+    'cerebras-model-input': CONFIG.cerebrasModel,
     'openrouter-key-input': CONFIG.openrouterKey,
-    'openrouter-model-select': CONFIG.openrouterModel,
+    'openrouter-model-input': CONFIG.openrouterModel,
     'nvidia-key-input': CONFIG.nvidiaKey,
-    'nvidia-model-select': CONFIG.nvidiaModel,
+    'nvidia-model-input': CONFIG.nvidiaModel,
     'siliconflow-key-input': CONFIG.siliconflowKey,
-    'siliconflow-model-select': CONFIG.siliconflowModel
+    'siliconflow-model-input': CONFIG.siliconflowModel
   };
   Object.keys(map).forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = map[id];
   });
+  // Populate advanced params
+  populateAdvancedParams();
+  // Update status dots
+  updateAllStatusDots();
   switchSetupTab(CONFIG.mode === 'local' ? 'local' : CONFIG.mode);
+}
+
+function populateAdvancedParams() {
+  const providerMap = {
+    local: 'localAdvanced', cloud: 'cloudAdvanced', openai: 'openaiAdvanced',
+    gemini: 'geminiAdvanced', azure: 'azureAdvanced', groq: 'groqAdvanced',
+    cerebras: 'cerebrasAdvanced', openrouter: 'openrouterAdvanced',
+    nvidia: 'nvidiaAdvanced', siliconflow: 'siliconflowAdvanced'
+  };
+  Object.keys(providerMap).forEach(provider => {
+    const adv = CONFIG[providerMap[provider]];
+    if (!adv) return;
+    const prefix = provider + '-adv';
+    const maxTokensEl = document.getElementById(prefix + '-max-tokens');
+    const tempEl = document.getElementById(prefix + '-temperature');
+    const topPEl = document.getElementById(prefix + '-top-p');
+    const streamEl = document.getElementById(prefix + '-stream');
+    const reasoningEl = document.getElementById(prefix + '-reasoning-effort');
+    const topKEl = document.getElementById(prefix + '-top-k');
+    if (maxTokensEl) maxTokensEl.value = adv.maxTokens;
+    if (tempEl) tempEl.value = adv.temperature;
+    if (topPEl) topPEl.value = adv.topP;
+    if (streamEl) streamEl.checked = adv.stream;
+    if (reasoningEl) reasoningEl.value = adv.reasoningEffort || '';
+    if (topKEl) topKEl.value = adv.topK || 0;
+  });
+}
+
+function saveAdvancedParams() {
+  const providerMap = {
+    local: 'localAdvanced', cloud: 'cloudAdvanced', openai: 'openaiAdvanced',
+    gemini: 'geminiAdvanced', azure: 'azureAdvanced', groq: 'groqAdvanced',
+    cerebras: 'cerebrasAdvanced', openrouter: 'openrouterAdvanced',
+    nvidia: 'nvidiaAdvanced', siliconflow: 'siliconflowAdvanced'
+  };
+  Object.keys(providerMap).forEach(provider => {
+    const adv = CONFIG[providerMap[provider]];
+    if (!adv) return;
+    const prefix = provider + '-adv';
+    const maxTokensEl = document.getElementById(prefix + '-max-tokens');
+    const tempEl = document.getElementById(prefix + '-temperature');
+    const topPEl = document.getElementById(prefix + '-top-p');
+    const streamEl = document.getElementById(prefix + '-stream');
+    const reasoningEl = document.getElementById(prefix + '-reasoning-effort');
+    const topKEl = document.getElementById(prefix + '-top-k');
+    if (maxTokensEl) adv.maxTokens = parseInt(maxTokensEl.value) || 2000;
+    if (tempEl) adv.temperature = parseFloat(tempEl.value) || 0.70;
+    if (topPEl) adv.topP = parseFloat(topPEl.value) || 1.00;
+    if (streamEl) adv.stream = streamEl.checked;
+    if (reasoningEl) adv.reasoningEffort = reasoningEl.value;
+    if (topKEl) adv.topK = parseInt(topKEl.value) || 0;
+  });
+}
+
+function updateAllStatusDots() {
+  const providers = ['local', 'cloud', 'openai', 'gemini', 'azure', 'groq', 'cerebras', 'openrouter', 'nvidia', 'siliconflow'];
+  providers.forEach(provider => {
+    const dotEl = document.getElementById(provider + '-status-dot');
+    const msgEl = document.getElementById(provider + '-test-result');
+    if (dotEl) {
+      dotEl.textContent = getStatusDot(provider);
+      dotEl.style.color = getStatusColor(provider);
+    }
+    if (msgEl) {
+      const cs = CONFIG.connectionStatus[provider];
+      msgEl.textContent = cs ? cs.message : 'Not tested yet';
+      msgEl.style.color = getStatusColor(provider);
+    }
+  });
+  // Update sidebar indicator
+  updateSetupIndicator();
 }
 
 function closeSetup() {
@@ -540,25 +667,28 @@ function saveSetup() {
   CONFIG.mode = activeSetupTab;
   CONFIG.ollamaUrl = (document.getElementById('ollama-url')?.value || '').trim().replace(/\/$/, '');
   CONFIG.apiKey = (document.getElementById('api-key-input')?.value || '').trim();
-  CONFIG.cloudModel = document.getElementById('cloud-model-select')?.value || CONFIG.cloudModel;
+  CONFIG.cloudModel = document.getElementById('cloud-model-input')?.value || CONFIG.cloudModel;
   CONFIG.openaiKey = (document.getElementById('openai-key-input')?.value || '').trim();
-  CONFIG.openaiModel = document.getElementById('openai-model-select')?.value || CONFIG.openaiModel;
+  CONFIG.openaiModel = document.getElementById('openai-model-input')?.value || CONFIG.openaiModel;
   CONFIG.geminiKey = (document.getElementById('gemini-key-input')?.value || '').trim();
-  CONFIG.geminiModel = document.getElementById('gemini-model-select')?.value || CONFIG.geminiModel;
+  CONFIG.geminiModel = document.getElementById('gemini-model-input')?.value || CONFIG.geminiModel;
   CONFIG.azureKey = (document.getElementById('azure-key-input')?.value || '').trim();
   CONFIG.azureEndpoint = (document.getElementById('azure-endpoint-input')?.value || '').trim().replace(/\/$/, '');
   CONFIG.azureDeployment = (document.getElementById('azure-deployment-input')?.value || '').trim();
-  CONFIG.azureModel = document.getElementById('azure-model-select')?.value || CONFIG.azureModel;
+  CONFIG.azureModel = document.getElementById('azure-model-input')?.value || CONFIG.azureModel;
   CONFIG.groqKey = (document.getElementById('groq-key-input')?.value || '').trim();
-  CONFIG.groqModel = document.getElementById('groq-model-select')?.value || CONFIG.groqModel;
+  CONFIG.groqModel = document.getElementById('groq-model-input')?.value || CONFIG.groqModel;
   CONFIG.cerebrasKey = (document.getElementById('cerebras-key-input')?.value || '').trim();
-  CONFIG.cerebrasModel = document.getElementById('cerebras-model-select')?.value || CONFIG.cerebrasModel;
+  CONFIG.cerebrasModel = document.getElementById('cerebras-model-input')?.value || CONFIG.cerebrasModel;
   CONFIG.openrouterKey = (document.getElementById('openrouter-key-input')?.value || '').trim();
-  CONFIG.openrouterModel = document.getElementById('openrouter-model-select')?.value || CONFIG.openrouterModel;
+  CONFIG.openrouterModel = document.getElementById('openrouter-model-input')?.value || CONFIG.openrouterModel;
   CONFIG.nvidiaKey = (document.getElementById('nvidia-key-input')?.value || '').trim();
-  CONFIG.nvidiaModel = document.getElementById('nvidia-model-select')?.value || CONFIG.nvidiaModel;
+  CONFIG.nvidiaModel = document.getElementById('nvidia-model-input')?.value || CONFIG.nvidiaModel;
   CONFIG.siliconflowKey = (document.getElementById('siliconflow-key-input')?.value || '').trim();
-  CONFIG.siliconflowModel = document.getElementById('siliconflow-model-select')?.value || CONFIG.siliconflowModel;
+  CONFIG.siliconflowModel = document.getElementById('siliconflow-model-input')?.value || CONFIG.siliconflowModel;
+
+  // Save advanced params
+  saveAdvancedParams();
 
   const statusEl = document.getElementById('setup-footer-status');
   if (!statusEl) { closeSetup(); updateSetupIndicator(); saveToStorage(); showToast(getProviderLabel() + ' mode active'); return; }
@@ -600,7 +730,8 @@ function updateSetupIndicator() {
   const btn = document.getElementById('setup-reopen-btn');
   if (!btn) return;
   const label = getProviderLabel();
-  btn.innerHTML = `⚙️ Connection Setup <span style="font-size:9px;padding:1px 6px;border-radius:8px;margin-left:4px;">${label}</span>`;
+  const dot = getStatusDot(CONFIG.mode);
+  btn.innerHTML = `⚙️ Connection Setup <span style="font-size:9px;padding:1px 6px;border-radius:8px;margin-left:4px;">${dot} ${label}</span>`;
 }
 
 function toggleKeyVisibility(inputId) {
@@ -608,7 +739,34 @@ function toggleKeyVisibility(inputId) {
   if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
 }
 
+// ─── Toggle advanced params visibility ───
+function toggleAdvanced(provider) {
+  const el = document.getElementById('advanced-' + provider);
+  if (el) el.classList.toggle('open');
+}
+
 // ─── Provider test functions ───
+function setConnectionStatus(provider, status, message) {
+  if (!CONFIG.connectionStatus[provider]) {
+    CONFIG.connectionStatus[provider] = { status: 'untested', message: 'Not tested yet' };
+  }
+  CONFIG.connectionStatus[provider].status = status;
+  CONFIG.connectionStatus[provider].message = message;
+  // Update dots
+  const dotEl = document.getElementById(provider + '-status-dot');
+  const msgEl = document.getElementById(provider + '-test-result');
+  if (dotEl) {
+    dotEl.textContent = getStatusDot(provider);
+    dotEl.style.color = getStatusColor(provider);
+  }
+  if (msgEl) {
+    msgEl.textContent = message;
+    msgEl.style.color = getStatusColor(provider);
+  }
+  updateSetupIndicator();
+  saveToStorage();
+}
+
 async function testOllama() {
   const url = (document.getElementById('ollama-url')?.value || '').trim().replace(/\/$/, '');
   const el = document.getElementById('ollama-test-result');
@@ -619,21 +777,19 @@ async function testOllama() {
     if (r.ok) {
       const d = await r.json();
       const names = (d.models || []).map(m => m.name).slice(0, 3).join(', ');
-      el.textContent = '✅ Connected — models: ' + (names || 'none pulled yet');
-      el.style.color = 'var(--success)';
+      setConnectionStatus('local', 'passed', '✅ Connected — models: ' + (names || 'none pulled yet'));
     } else { throw new Error('HTTP ' + r.status); }
   } catch(e) {
-    el.textContent = '❌ Could not reach Ollama (' + e.message + ')';
-    el.style.color = 'var(--danger)';
+    setConnectionStatus('local', 'failed', '❌ Could not reach Ollama (' + e.message + ')');
   }
 }
 
 async function testCloudAPI() {
   const key = (document.getElementById('api-key-input')?.value || '').trim();
-  const model = document.getElementById('cloud-model-select')?.value || CONFIG.cloudModel;
+  const model = document.getElementById('cloud-model-input')?.value || CONFIG.cloudModel;
   const el = document.getElementById('cloud-test-result');
   if (!el) return;
-  if (!key) { el.textContent = '⚠️ Enter an API key first'; el.style.color = 'var(--warning)'; return; }
+  if (!key) { setConnectionStatus('cloud', 'failed', '⚠️ Enter an API key first'); return; }
   el.textContent = 'Testing…'; el.style.color = 'var(--text-3)';
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -641,17 +797,17 @@ async function testCloudAPI() {
       headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({ model, max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
     });
-    if (r.ok) { el.textContent = '✅ API key valid — ' + model; el.style.color = 'var(--success)'; }
-    else { const d = await r.json(); el.textContent = '❌ ' + (d.error?.message || 'Invalid key'); el.style.color = 'var(--danger)'; }
-  } catch(e) { el.textContent = '❌ ' + e.message; el.style.color = 'var(--danger)'; }
+    if (r.ok) { setConnectionStatus('cloud', 'passed', '✅ API key valid — ' + model); }
+    else { const d = await r.json(); setConnectionStatus('cloud', 'failed', '❌ ' + (d.error?.message || 'Invalid key')); }
+  } catch(e) { setConnectionStatus('cloud', 'failed', '❌ ' + e.message); }
 }
 
 async function testOpenAI() {
   const key = (document.getElementById('openai-key-input')?.value || '').trim();
-  const model = document.getElementById('openai-model-select')?.value || CONFIG.openaiModel;
+  const model = document.getElementById('openai-model-input')?.value || CONFIG.openaiModel;
   const el = document.getElementById('openai-test-result');
   if (!el) return;
-  if (!key) { el.textContent = '⚠️ Enter an API key first'; el.style.color = 'var(--warning)'; return; }
+  if (!key) { setConnectionStatus('openai', 'failed', '⚠️ Enter an API key first'); return; }
   el.textContent = 'Testing…'; el.style.color = 'var(--text-3)';
   try {
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -659,17 +815,17 @@ async function testOpenAI() {
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
       body: JSON.stringify({ model, max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
     });
-    if (r.ok) { el.textContent = '✅ API key valid — ' + model; el.style.color = 'var(--success)'; }
-    else { const d = await r.json(); el.textContent = '❌ ' + (d.error?.message || 'Invalid key'); el.style.color = 'var(--danger)'; }
-  } catch(e) { el.textContent = '❌ ' + e.message; el.style.color = 'var(--danger)'; }
+    if (r.ok) { setConnectionStatus('openai', 'passed', '✅ API key valid — ' + model); }
+    else { const d = await r.json(); setConnectionStatus('openai', 'failed', '❌ ' + (d.error?.message || 'Invalid key')); }
+  } catch(e) { setConnectionStatus('openai', 'failed', '❌ ' + e.message); }
 }
 
 async function testGemini() {
   const key = (document.getElementById('gemini-key-input')?.value || '').trim();
-  const model = document.getElementById('gemini-model-select')?.value || CONFIG.geminiModel;
+  const model = document.getElementById('gemini-model-input')?.value || CONFIG.geminiModel;
   const el = document.getElementById('gemini-test-result');
   if (!el) return;
-  if (!key) { el.textContent = '⚠️ Enter an API key first'; el.style.color = 'var(--warning)'; return; }
+  if (!key) { setConnectionStatus('gemini', 'failed', '⚠️ Enter an API key first'); return; }
   el.textContent = 'Testing…'; el.style.color = 'var(--text-3)';
   try {
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
@@ -677,9 +833,9 @@ async function testGemini() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: 'Hi' }] }] })
     });
-    if (r.ok) { el.textContent = '✅ API key valid — ' + model; el.style.color = 'var(--success)'; }
-    else { const d = await r.json(); el.textContent = '❌ ' + (d.error?.message || 'Invalid key'); el.style.color = 'var(--danger)'; }
-  } catch(e) { el.textContent = '❌ ' + e.message; el.style.color = 'var(--danger)'; }
+    if (r.ok) { setConnectionStatus('gemini', 'passed', '✅ API key valid — ' + model); }
+    else { const d = await r.json(); setConnectionStatus('gemini', 'failed', '❌ ' + (d.error?.message || 'Invalid key')); }
+  } catch(e) { setConnectionStatus('gemini', 'failed', '❌ ' + e.message); }
 }
 
 async function testAzure() {
@@ -688,7 +844,7 @@ async function testAzure() {
   const deployment = (document.getElementById('azure-deployment-input')?.value || '').trim();
   const el = document.getElementById('azure-test-result');
   if (!el) return;
-  if (!key || !endpoint || !deployment) { el.textContent = '⚠️ Fill in all fields first'; el.style.color = 'var(--warning)'; return; }
+  if (!key || !endpoint || !deployment) { setConnectionStatus('azure', 'failed', '⚠️ Fill in all fields first'); return; }
   el.textContent = 'Testing…'; el.style.color = 'var(--text-3)';
   try {
     const r = await fetch(`${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=2024-02-01`, {
@@ -696,17 +852,17 @@ async function testAzure() {
       headers: { 'Content-Type': 'application/json', 'api-key': key },
       body: JSON.stringify({ messages: [{ role: 'user', content: 'Hi' }], max_tokens: 10 })
     });
-    if (r.ok) { el.textContent = '✅ Connected — ' + deployment; el.style.color = 'var(--success)'; }
-    else { const d = await r.json(); el.textContent = '❌ ' + (d.error?.message || 'Connection failed'); el.style.color = 'var(--danger)'; }
-  } catch(e) { el.textContent = '❌ ' + e.message; el.style.color = 'var(--danger)'; }
+    if (r.ok) { setConnectionStatus('azure', 'passed', '✅ Connected — ' + deployment); }
+    else { const d = await r.json(); setConnectionStatus('azure', 'failed', '❌ ' + (d.error?.message || 'Connection failed')); }
+  } catch(e) { setConnectionStatus('azure', 'failed', '❌ ' + e.message); }
 }
 
 async function testGroq() {
   const key = (document.getElementById('groq-key-input')?.value || '').trim();
-  const model = document.getElementById('groq-model-select')?.value || CONFIG.groqModel;
+  const model = document.getElementById('groq-model-input')?.value || CONFIG.groqModel;
   const el = document.getElementById('groq-test-result');
   if (!el) return;
-  if (!key) { el.textContent = '⚠️ Enter an API key first'; el.style.color = 'var(--warning)'; return; }
+  if (!key) { setConnectionStatus('groq', 'failed', '⚠️ Enter an API key first'); return; }
   el.textContent = 'Testing…'; el.style.color = 'var(--text-3)';
   try {
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -714,17 +870,17 @@ async function testGroq() {
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
       body: JSON.stringify({ model, max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
     });
-    if (r.ok) { el.textContent = '✅ Connected — ' + model; el.style.color = 'var(--success)'; }
-    else { const d = await r.json(); el.textContent = '❌ ' + (d.error?.message || 'Connection failed'); el.style.color = 'var(--danger)'; }
-  } catch(e) { el.textContent = '❌ ' + e.message; el.style.color = 'var(--danger)'; }
+    if (r.ok) { setConnectionStatus('groq', 'passed', '✅ Connected — ' + model); }
+    else { const d = await r.json(); setConnectionStatus('groq', 'failed', '❌ ' + (d.error?.message || 'Connection failed')); }
+  } catch(e) { setConnectionStatus('groq', 'failed', '❌ ' + e.message); }
 }
 
 async function testCerebras() {
   const key = (document.getElementById('cerebras-key-input')?.value || '').trim();
-  const model = document.getElementById('cerebras-model-select')?.value || CONFIG.cerebrasModel;
+  const model = document.getElementById('cerebras-model-input')?.value || CONFIG.cerebrasModel;
   const el = document.getElementById('cerebras-test-result');
   if (!el) return;
-  if (!key) { el.textContent = '⚠️ Enter an API key first'; el.style.color = 'var(--warning)'; return; }
+  if (!key) { setConnectionStatus('cerebras', 'failed', '⚠️ Enter an API key first'); return; }
   el.textContent = 'Testing…'; el.style.color = 'var(--text-3)';
   try {
     const r = await fetch('https://api.cerebras.ai/v1/chat/completions', {
@@ -732,17 +888,17 @@ async function testCerebras() {
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
       body: JSON.stringify({ model, max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
     });
-    if (r.ok) { el.textContent = '✅ Connected — ' + model; el.style.color = 'var(--success)'; }
-    else { const d = await r.json(); el.textContent = '❌ ' + (d.error?.message || 'Connection failed'); el.style.color = 'var(--danger)'; }
-  } catch(e) { el.textContent = '❌ ' + e.message; el.style.color = 'var(--danger)'; }
+    if (r.ok) { setConnectionStatus('cerebras', 'passed', '✅ Connected — ' + model); }
+    else { const d = await r.json(); setConnectionStatus('cerebras', 'failed', '❌ ' + (d.error?.message || 'Connection failed')); }
+  } catch(e) { setConnectionStatus('cerebras', 'failed', '❌ ' + e.message); }
 }
 
 async function testOpenRouter() {
   const key = (document.getElementById('openrouter-key-input')?.value || '').trim();
-  const model = document.getElementById('openrouter-model-select')?.value || CONFIG.openrouterModel;
+  const model = document.getElementById('openrouter-model-input')?.value || CONFIG.openrouterModel;
   const el = document.getElementById('openrouter-test-result');
   if (!el) return;
-  if (!key) { el.textContent = '⚠️ Enter an API key first'; el.style.color = 'var(--warning)'; return; }
+  if (!key) { setConnectionStatus('openrouter', 'failed', '⚠️ Enter an API key first'); return; }
   el.textContent = 'Testing…'; el.style.color = 'var(--text-3)';
   try {
     const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -750,17 +906,17 @@ async function testOpenRouter() {
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
       body: JSON.stringify({ model, max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
     });
-    if (r.ok) { el.textContent = '✅ Connected — ' + model; el.style.color = 'var(--success)'; }
-    else { const d = await r.json(); el.textContent = '❌ ' + (d.error?.message || 'Connection failed'); el.style.color = 'var(--danger)'; }
-  } catch(e) { el.textContent = '❌ ' + e.message; el.style.color = 'var(--danger)'; }
+    if (r.ok) { setConnectionStatus('openrouter', 'passed', '✅ Connected — ' + model); }
+    else { const d = await r.json(); setConnectionStatus('openrouter', 'failed', '❌ ' + (d.error?.message || 'Connection failed')); }
+  } catch(e) { setConnectionStatus('openrouter', 'failed', '❌ ' + e.message); }
 }
 
 async function testNvidia() {
   const key = (document.getElementById('nvidia-key-input')?.value || '').trim();
-  const model = document.getElementById('nvidia-model-select')?.value || CONFIG.nvidiaModel;
+  const model = document.getElementById('nvidia-model-input')?.value || CONFIG.nvidiaModel;
   const el = document.getElementById('nvidia-test-result');
   if (!el) return;
-  if (!key) { el.textContent = '⚠️ Enter an API key first'; el.style.color = 'var(--warning)'; return; }
+  if (!key) { setConnectionStatus('nvidia', 'failed', '⚠️ Enter an API key first'); return; }
   el.textContent = 'Testing…'; el.style.color = 'var(--text-3)';
   try {
     const isServerMode = window.location.protocol !== 'file:';
@@ -777,17 +933,17 @@ async function testNvidia() {
       headers: headers,
       body: JSON.stringify(body)
     });
-    if (r.ok) { el.textContent = '✅ Connected — ' + model; el.style.color = 'var(--success)'; }
-    else { const d = await r.json(); el.textContent = '❌ ' + (d.error?.message || 'Connection failed'); el.style.color = 'var(--danger)'; }
-  } catch(e) { el.textContent = '❌ ' + e.message; el.style.color = 'var(--danger)'; }
+    if (r.ok) { setConnectionStatus('nvidia', 'passed', '✅ Connected — ' + model); }
+    else { const d = await r.json(); setConnectionStatus('nvidia', 'failed', '❌ ' + (d.error?.message || 'Connection failed')); }
+  } catch(e) { setConnectionStatus('nvidia', 'failed', '❌ ' + e.message); }
 }
 
 async function testSiliconflow() {
   const key = (document.getElementById('siliconflow-key-input')?.value || '').trim();
-  const model = document.getElementById('siliconflow-model-select')?.value || CONFIG.siliconflowModel;
+  const model = document.getElementById('siliconflow-model-input')?.value || CONFIG.siliconflowModel;
   const el = document.getElementById('siliconflow-test-result');
   if (!el) return;
-  if (!key) { el.textContent = '⚠️ Enter an API key first'; el.style.color = 'var(--warning)'; return; }
+  if (!key) { setConnectionStatus('siliconflow', 'failed', '⚠️ Enter an API key first'); return; }
   el.textContent = 'Testing…'; el.style.color = 'var(--text-3)';
   try {
     const r = await fetch('https://api.siliconflow.com/v1/chat/completions', {
@@ -795,9 +951,9 @@ async function testSiliconflow() {
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
       body: JSON.stringify({ model, max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
     });
-    if (r.ok) { el.textContent = '✅ Connected — ' + model; el.style.color = 'var(--success)'; }
-    else { const d = await r.json(); el.textContent = '❌ ' + (d.error?.message || 'Connection failed'); el.style.color = 'var(--danger)'; }
-  } catch(e) { el.textContent = '❌ ' + e.message; el.style.color = 'var(--danger)'; }
+    if (r.ok) { setConnectionStatus('siliconflow', 'passed', '✅ Connected — ' + model); }
+    else { const d = await r.json(); setConnectionStatus('siliconflow', 'failed', '❌ ' + (d.error?.message || 'Connection failed')); }
+  } catch(e) { setConnectionStatus('siliconflow', 'failed', '❌ ' + e.message); }
 }
 
 // ─── Model modal ───
