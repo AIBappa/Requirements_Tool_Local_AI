@@ -33,6 +33,7 @@ const STORAGE_KEY = 'pipeline-author-data';
 // ─── Setup overlay state ───
 let activeSetupTab = 'local';
 let exportDropdownOpen = false;
+let globalViewMode = 'wizard'; // 'wizard' | 'full'
 
 // ─── Helper functions ───
 function escHtml(s) {
@@ -100,6 +101,23 @@ function toggleTheme() {
   }
   const btn = document.getElementById('theme-toggle');
   if (btn) btn.textContent = isDark ? '🌙' : '☀️';
+}
+
+function toggleGlobalViewMode() {
+  globalViewMode = globalViewMode === 'wizard' ? 'full' : 'wizard';
+  updateViewModeButton();
+  if (typeof s1ViewMode !== 'undefined') {
+    s1ViewMode = globalViewMode;
+  }
+  renderStage();
+  showToast(globalViewMode === 'full' ? 'Full Document View' : 'Wizard Mode');
+}
+
+function updateViewModeButton() {
+  const btn = document.getElementById('view-mode-toggle');
+  if (btn) {
+    btn.textContent = globalViewMode === 'wizard' ? '📄 Full View' : '🧙 Wizard View';
+  }
 }
 
 // ─── Local Storage persistence ───
@@ -251,10 +269,11 @@ async function exportPDF() {
       const stage = PIPELINE[currentStage - 1];
       const contentEl = document.getElementById('content');
 
-      let savedS1ViewMode = null;
-      if (stage.id === 1 && typeof s1ViewMode !== 'undefined' && s1ViewMode === 'wizard') {
-        savedS1ViewMode = s1ViewMode;
-        s1ViewMode = 'full';
+      let savedViewMode = null;
+      if (stage.id === 1 && globalViewMode === 'wizard') {
+        savedViewMode = globalViewMode;
+        globalViewMode = 'full';
+        if (typeof s1ViewMode !== 'undefined') s1ViewMode = 'full';
         renderStage();
         await new Promise(r => setTimeout(r, 350));
       }
@@ -328,8 +347,10 @@ async function exportPDF() {
           }
         });
 
-        if (savedS1ViewMode !== null && typeof s1ViewMode !== 'undefined') {
-          s1ViewMode = savedS1ViewMode;
+        if (savedViewMode !== null) {
+          globalViewMode = savedViewMode;
+          if (typeof s1ViewMode !== 'undefined') s1ViewMode = savedViewMode;
+          updateViewModeButton();
           renderStage();
         }
 
@@ -348,8 +369,10 @@ async function exportPDF() {
           }
         });
 
-        if (savedS1ViewMode !== null && typeof s1ViewMode !== 'undefined') {
-          s1ViewMode = savedS1ViewMode;
+        if (savedViewMode !== null) {
+          globalViewMode = savedViewMode;
+          if (typeof s1ViewMode !== 'undefined') s1ViewMode = savedViewMode;
+          updateViewModeButton();
           renderStage();
         }
 

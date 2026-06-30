@@ -334,12 +334,6 @@ function renderStage1PRD(content) {
   stageBar.id = 's1-stage-bar';
   content.appendChild(stageBar);
 
-  // View toggle button
-  const toggleDiv = document.createElement('div');
-  toggleDiv.style.cssText = 'text-align:right;padding:4px 0;';
-  toggleDiv.innerHTML = `<button class="btn btn-sm" onclick="s1SwitchView('full')" title="View full document with all sections expanded">📄 Full Document View</button>`;
-  content.appendChild(toggleDiv);
-
   // Question card
   const card = document.createElement('div');
   card.className = 's1-question-card';
@@ -357,7 +351,9 @@ function renderStage1PRD(content) {
 
 function s1SwitchView(mode) {
   s1ViewMode = mode;
+  globalViewMode = mode;
   saveStage1Inputs();
+  updateViewModeButton();
   renderStage();
 }
 
@@ -374,12 +370,6 @@ function renderStage1FullView(content) {
   stageBar.className = 's1-stage-bar';
   stageBar.id = 's1-stage-bar';
   content.appendChild(stageBar);
-
-  // View toggle button
-  const toggleDiv = document.createElement('div');
-  toggleDiv.style.cssText = 'text-align:right;padding:4px 0;';
-  toggleDiv.innerHTML = `<button class="btn btn-sm btn-primary" onclick="s1SwitchView('wizard')" title="Switch to single-question wizard mode">🧙 Wizard Mode</button>`;
-  content.appendChild(toggleDiv);
 
   // Title
   const title = document.createElement('div');
