@@ -302,39 +302,66 @@ async function exportPDF() {
         }
       });
 
-      const clone = contentEl.cloneNode(true);
-      clone.style.width = '800px';
-      clone.style.padding = '24px';
-      clone.style.background = 'white';
-      clone.style.position = 'absolute';
-      clone.style.left = '-9999px';
-      clone.style.top = '0';
-      clone.style.filter = 'grayscale(100%) contrast(1.1)';
-      document.body.appendChild(clone);
+      // Replace all textareas with read-only divs so html2canvas captures their full content
+      const textareaReplacements = [];
+      contentEl.querySelectorAll('textarea').forEach(textarea => {
+        const div = document.createElement('div');
+        div.className = textarea.className + ' s1-pdf-capture';
+        div.style.cssText = textarea.style.cssText + ';white-space:pre-wrap;overflow:visible;min-height:' + textarea.scrollHeight + 'px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-family:inherit;font-size:inherit;line-height:1.6;color:var(--text-1);';
+        div.textContent = textarea.value || textarea.placeholder || '';
+        div.setAttribute('data-original-tag', 'textarea');
+        textarea.parentNode.insertBefore(div, textarea);
+        textarea.style.display = 'none';
+        textareaReplacements.push({ original: textarea, replacement: div });
+      });
 
-      html2canvas(clone, { scale: 2, useCORS: true }).then(canvas => {
-        const imgData = canvas.toDataURL('image/png');
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        const imgWidth = pdfWidth;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        let heightLeft = imgHeight;
-        let position = 0;
+      const sections = Array.from(contentEl.children);
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+      const contentWidth = pdfWidth - margin * 2;
 
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pdfHeight;
+      let pageIndex = 0;
+      let failed = false;
 
-        while (heightLeft > 0) {
-          position = heightLeft - imgHeight;
-          pdf.addPage();
-          pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-          heightLeft -= pdfHeight;
+      async function renderSectionToPdf(sectionEl) {
+        if (failed) return;
+        if (!sectionEl.textContent.trim() && !sectionEl.querySelector('img, canvas, svg')) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'position:absolute;left:-9999px;top:0;width:800px;padding:24px;background:white;';
+        wrapper.appendChild(sectionEl.cloneNode(true));
+        document.body.appendChild(wrapper);
+
+        try {
+          const canvas = await html2canvas(wrapper, { scale: 2, useCORS: true });
+          const imgData = canvas.toDataURL('image/png');
+          const imgHeight = (canvas.height * contentWidth) / canvas.width;
+
+          if (pageIndex > 0) pdf.addPage();
+          pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, imgHeight);
+          pageIndex++;
+        } catch (err) {
+          failed = true;
+          throw err;
+        } finally {
+          document.body.removeChild(wrapper);
         }
+      }
 
-        pdf.save(`stage-${stage.id}-${stage.name.replace(/[^a-zA-Z0-9]/g,'-')}.pdf`);
-        document.body.removeChild(clone);
+      for (const sectionEl of sections) {
+        await renderSectionToPdf(sectionEl);
+      }
+
+      pdf.save(`stage-${stage.id}-${stage.name.replace(/[^a-zA-Z0-9]/g,'-')}.pdf`);
+
+        // Restore textareas
+        textareaReplacements.forEach(({ original, replacement }) => {
+          original.style.display = '';
+          if (replacement.parentNode) replacement.parentNode.removeChild(replacement);
+        });
 
         hiddenElements.forEach(item => {
           if (item.originalDisplay) {
@@ -356,7 +383,11 @@ async function exportPDF() {
 
         showToast('PDF exported ✓');
       }).catch(err => {
-        document.body.removeChild(clone);
+        // Restore textareas even on error
+        textareaReplacements.forEach(({ original, replacement }) => {
+          original.style.display = '';
+          if (replacement.parentNode) replacement.parentNode.removeChild(replacement);
+        });
 
         hiddenElements.forEach(item => {
           if (item.originalDisplay) {
