@@ -17,3 +17,7 @@ sessions/
 
 # Saved exports folder
 saved_exports/
+
+#Agentic scripts folder
+/Code/AI_scripts/
+payload.json
