@@ -258,189 +258,225 @@ function importPipelineJSON(file) {
   reader.readAsText(file);
 }
 
-// ─── PDF Export ───
-async function exportPDF() {
-  const html2canvasScript = document.createElement('script');
-  html2canvasScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-  html2canvasScript.onload = async function() {
-    const jsPDFScript = document.createElement('script');
-    jsPDFScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-    jsPDFScript.onload = async function() {
-      const stage = PIPELINE[currentStage - 1];
-      const contentEl = document.getElementById('content');
+// ─── Build export payload for server ───
+function buildExportPayload() {
+  // Gather ALL stage data (all 9 stages)
+  const exportStageData = {};
+  PIPELINE.forEach(stage => {
+    const sid = String(stage.id);
+    exportStageData[sid] = stageData[stage.id];
+  });
 
-      let savedViewMode = null;
-      if (stage.id === 1 && globalViewMode === 'wizard') {
-        savedViewMode = globalViewMode;
-        globalViewMode = 'full';
-        if (typeof s1ViewMode !== 'undefined') s1ViewMode = 'full';
-        renderStage();
-        await new Promise(r => setTimeout(r, 350));
+  // Include the PIPELINE definition so the server knows how to interpret the data
+  // Deep-clean PIPELINE to remove any functions/classes that can't be serialized
+  const cleanPipeline = PIPELINE.map(stage => {
+    const clean = {};
+    Object.keys(stage).forEach(k => {
+      const v = stage[k];
+      if (typeof v !== 'function' && typeof v !== 'symbol') {
+        clean[k] = v;
       }
+    });
+    return clean;
+  });
 
-      // Collect all collapsible/hidden elements and their original states
-      const hiddenElements = [];
-      const selectors = [
-        '.s1-accordion-body',
-        '.frs-hist-body',
-        '.review-notes',
-        '[style*="display: none"]',
-        '[style*="display:none"]',
-        '.hidden'
-      ];
-
-      document.querySelectorAll(selectors.join(', ')).forEach(el => {
-        if (el.closest('#content') || el.closest('#content *')) {
-          hiddenElements.push({
-            el: el,
-            originalDisplay: el.style.display,
-            originalClass: el.className,
-            originalHidden: el.classList.contains('hidden')
-          });
-          el.style.display = 'block';
-          el.classList.remove('hidden');
-        }
-      });
-
-      // Replace all textareas with read-only divs so html2canvas captures their full content
-      const textareaReplacements = [];
-      contentEl.querySelectorAll('textarea').forEach(textarea => {
-        const div = document.createElement('div');
-        div.className = textarea.className + ' s1-pdf-capture';
-        div.style.cssText = textarea.style.cssText + ';white-space:pre-wrap;overflow:visible;min-height:' + textarea.scrollHeight + 'px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-family:inherit;font-size:inherit;line-height:1.6;color:var(--text-1);';
-        div.textContent = textarea.value || textarea.placeholder || '';
-        div.setAttribute('data-original-tag', 'textarea');
-        textarea.parentNode.insertBefore(div, textarea);
-        textarea.style.display = 'none';
-        textareaReplacements.push({ original: textarea, replacement: div });
-      });
-
-      const sections = Array.from(contentEl.children);
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const margin = 10;
-      const contentWidth = pdfWidth - margin * 2;
-
-      let pageIndex = 0;
-      let failed = false;
-
-      async function renderSectionToPdf(sectionEl) {
-        if (failed) return;
-        if (!sectionEl.textContent.trim() && !sectionEl.querySelector('img, canvas, svg')) return;
-
-        const wrapper = document.createElement('div');
-        wrapper.style.cssText = 'position:absolute;left:-9999px;top:0;width:800px;padding:24px;background:white;';
-        wrapper.appendChild(sectionEl.cloneNode(true));
-        document.body.appendChild(wrapper);
-
-        try {
-          const canvas = await html2canvas(wrapper, { scale: 2, useCORS: true });
-          const imgData = canvas.toDataURL('image/png');
-          const imgHeight = (canvas.height * contentWidth) / canvas.width;
-
-          if (pageIndex > 0) pdf.addPage();
-          pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, imgHeight);
-          pageIndex++;
-        } catch (err) {
-          failed = true;
-          throw err;
-        } finally {
-          document.body.removeChild(wrapper);
-        }
-      }
-
-      try {
-        for (const sectionEl of sections) {
-          await renderSectionToPdf(sectionEl);
-        }
-
-        pdf.save(`stage-${stage.id}-${stage.name.replace(/[^a-zA-Z0-9]/g,'-')}.pdf`);
-        showToast('PDF exported ✓');
-      } catch (err) {
-        showToast('PDF export failed: ' + err.message);
-      } finally {
-        // Restore textareas
-        textareaReplacements.forEach(({ original, replacement }) => {
-          original.style.display = '';
-          if (replacement.parentNode) replacement.parentNode.removeChild(replacement);
-        });
-
-        hiddenElements.forEach(item => {
-          if (item.originalDisplay) {
-            item.el.style.display = item.originalDisplay;
-          } else {
-            item.el.style.display = '';
-          }
-          if (item.originalClass) {
-            item.el.className = item.originalClass;
-          }
-        });
-
-        if (savedViewMode !== null) {
-          globalViewMode = savedViewMode;
-          if (typeof s1ViewMode !== 'undefined') s1ViewMode = savedViewMode;
-          updateViewModeButton();
-          renderStage();
-        }
-      }
-    };
-    document.head.appendChild(jsPDFScript);
+  return {
+    stageData: exportStageData,
+    pipelineDef: cleanPipeline
   };
-  document.head.appendChild(html2canvasScript);
 }
 
-// ─── DOCX Export ───
-function exportDOCX() {
-  const stage = PIPELINE[currentStage - 1];
-  const sd = stageData[currentStage];
-
-  let html = `<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><title>${escHtml(stage.name)}</title></head>
-<body style="font-family:Inter,sans-serif;max-width:800px;margin:auto;padding:20px;">
-<h1 style="color:#1e1b3a;">Stage ${stage.id}: ${escHtml(stage.name)}</h1>
-<hr style="border:1px solid #e2e0f5;">`;
-
-  if (stage.hasPrdIntro && sd && sd.prdIntro) {
-    const p = sd.prdIntro;
-    html += `<h2 style="color:#4a4770;margin-top:20px;">Product Introduction</h2>
-<table style="width:100%;border-collapse:collapse;">
-<tr><td style="font-weight:600;padding:4px 8px;width:140px;">Product Name</td><td style="padding:4px 8px;">${escHtml(p.productName)}</td></tr>
-<tr><td style="font-weight:600;padding:4px 8px;">Tagline</td><td style="padding:4px 8px;">${escHtml(p.tagline)}</td></tr>
-<tr><td style="font-weight:600;padding:4px 8px;">Target Users</td><td style="padding:4px 8px;">${escHtml(p.targetUsers)}</td></tr>
-<tr><td style="font-weight:600;padding:4px 8px;">Problem</td><td style="padding:4px 8px;">${escHtml(p.problem)}</td></tr>
-<tr><td style="font-weight:600;padding:4px 8px;">Goals</td><td style="padding:4px 8px;">${escHtml(p.goals)}</td></tr>
-</table>`;
-  }
-
-  if (stage.manualDeliverables.length > 0) {
-    html += `<h2 style="color:#4a4770;margin-top:20px;">Manual Inputs</h2>`;
-    stage.manualDeliverables.forEach(d => {
-      html += `<h3 style="color:#6366f1;font-size:14px;">${escHtml(d.label)}</h3>
-<pre style="background:#f8f7ff;padding:10px;border-radius:6px;white-space:pre-wrap;">${escHtml(sd ? sd.manualInputs[d.id] : '')}</pre>`;
+// ─── PDF Export (server-side generation) ───
+async function exportPDF() {
+  try {
+    if (typeof saveCurrentInputs === 'function') saveCurrentInputs();
+    
+    const payload = buildExportPayload();
+    
+    const response = await fetch('/api/export/pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
-  }
 
-  if (stage.aiDeliverables.length > 0) {
-    html += `<h2 style="color:#4a4770;margin-top:20px;">AI-Generated Outputs</h2>`;
-    stage.aiDeliverables.forEach(d => {
-      html += `<h3 style="color:#6366f1;font-size:14px;">${escHtml(d.label)}</h3>
-<pre style="background:#f0fdf4;padding:10px;border-radius:6px;white-space:pre-wrap;">${escHtml(sd ? sd.aiOutputs[d.id] : '')}</pre>`;
+    if (!response.ok) {
+      const errData = await response.json().catch(() => null);
+      throw new Error(errData?.error || `Server error ${response.status}`);
+    }
+
+    // Get the filename from Content-Disposition header
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const filenameMatch = disposition.match(/filename="?([^";\n]+)"?/);
+    const filename = filenameMatch ? filenameMatch[1] : `pipeline-export-${Date.now()}.pdf`;
+
+    // Download the blob
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast('PDF exported ✓');
+  } catch (err) {
+    showToast('PDF export failed: ' + err.message);
+    console.error('PDF export error:', err);
+  }
+}
+
+// ─── DOCX Export (server-side generation) ───
+async function exportDOCX() {
+  try {
+    if (typeof saveCurrentInputs === 'function') saveCurrentInputs();
+    
+    const payload = buildExportPayload();
+    
+    const response = await fetch('/api/export/docx', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => null);
+      throw new Error(errData?.error || `Server error ${response.status}`);
+    }
+
+    // Get the filename from Content-Disposition header
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const filenameMatch = disposition.match(/filename="?([^";\n]+)"?/);
+    const filename = filenameMatch ? filenameMatch[1] : `pipeline-export-${Date.now()}.docx`;
+
+    // Download the blob
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast('DOCX exported ✓');
+  } catch (err) {
+    showToast('DOCX export failed: ' + err.message);
+    console.error('DOCX export error:', err);
   }
+}
 
-  html += `</body></html>`;
+// ─── CSV Export (client-side generation) ───
+function exportCSV() {
+  try {
+    if (typeof saveCurrentInputs === 'function') saveCurrentInputs();
+    
+    const payload = buildExportPayload();
+    
+    // Build CSV content
+    let csv = 'Stage ID,Stage Name,Section,Field ID,Field Label,Type,Value\n';
+    
+    PIPELINE.forEach(stage => {
+      const sid = String(stage.id);
+      const sd = stageData[stage.id];
+      const stageName = stage.name || '';
+      const isStage1 = stage.isStage1PRD || false;
+      
+      if (isStage1) {
+        // Stage 1 PRD: enumerate all inputs
+        const inputs = sd.inputs || {};
+        Object.keys(inputs).forEach(key => {
+          let val = inputs[key];
+          let label = key;
+          let section = '';
+          let type = typeof val;
+          
+          if (Array.isArray(val)) {
+            val = val.join('; ');
+            type = 'array';
+          }
+          
+          // Determine section from known config
+          if (key.startsWith('D1.1') || key.startsWith('D1.2')) section = 'Product Basics';
+          else if (key.startsWith('D1.3')) section = 'Repository';
+          else if (key.startsWith('D1.4') || key.startsWith('D2.1') || key.startsWith('D2.2')) section = 'Functions';
+          else if (key.startsWith('D1.6')) section = 'Infrastructure';
+          else if (key.startsWith('D3')) section = 'External Linkages';
+          else if (key.startsWith('D5')) section = 'Auto-Checks';
+          else section = 'Other';
+          
+          csv += `${sid},${escCsv(stageName)},${escCsv(section)},${escCsv(key)},${escCsv(label)},${escCsv(type)},${escCsv(String(val))}\n`;
+        });
+        
+        // Function names/summaries/scoping
+        (sd.functionNames || []).forEach((name, i) => {
+          csv += `${sid},${escCsv(stageName)},Functions,D1.4.2.${i+1},Function ${i+1} Name,text,${escCsv(name)}\n`;
+          const summary = (sd.functionSummaries || [])[i] || '';
+          csv += `${sid},${escCsv(stageName)},Functions,D2.1.${i+1},Function ${i+1} Summary,text,${escCsv(summary)}\n`;
+          const scope = (sd.functionScoping || [])[i] || [];
+          csv += `${sid},${escCsv(stageName)},Functions,D2.2.${i+1},Function ${i+1} Scope,array,${escCsv(scope.join('; '))}\n`;
+        });
+        
+        // D5 / D4
+        if (sd.d5Results) {
+          csv += `${sid},${escCsv(stageName)},Auto-Checks,D5,D5 Auto-Checks Results,text,${escCsv(sd.d5Results)}\n`;
+        }
+        if (sd.d4ContextDiagram) {
+          csv += `${sid},${escCsv(stageName)},Context Diagram,D4,D4 Context Diagram,text,${escCsv(sd.d4ContextDiagram)}\n`;
+        }
+      }
+      
+      // Manual inputs (stages 2-9)
+      (stage.manualDeliverables || []).forEach(d => {
+        const val = sd.manualInputs[d.id] || '';
+        csv += `${sid},${escCsv(stageName)},Manual Inputs,${escCsv(d.id)},${escCsv(d.label)},text,${escCsv(val)}\n`;
+      });
+      
+      // AI outputs
+      (stage.aiDeliverables || []).forEach(d => {
+        const val = sd.aiOutputs[d.id] || '';
+        csv += `${sid},${escCsv(stageName)},AI Outputs,${escCsv(d.id)},${escCsv(d.label)},text,${escCsv(val)}\n`;
+      });
+      
+      // Gate reviews
+      (stage.gateReviews || []).forEach(r => {
+        const notes = sd.reviewNotes[r.id] || '';
+        csv += `${sid},${escCsv(stageName)},Gate Reviews,${escCsv(r.id)},${escCsv(r.question)},text,${escCsv(notes)}\n`;
+      });
+      
+      // Completed status
+      csv += `${sid},${escCsv(stageName)},Status,completed,,boolean,${sd.completed ? 'Yes' : 'No'}\n`;
+    });
+    
+    // Download CSV
+    const bom = '\uFEFF'; // UTF-8 BOM for Excel compatibility
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pipeline-export-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showToast('CSV exported ✓');
+  } catch (err) {
+    showToast('CSV export failed: ' + err.message);
+    console.error('CSV export error:', err);
+  }
+}
 
-  const blob = new Blob([html], { type: 'application/msword' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `stage-${stage.id}-${stage.name.replace(/[^a-zA-Z0-9]/g,'-')}.doc`;
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('DOCX exported ✓ (opens in Word)');
+function escCsv(s) {
+  if (!s) return '';
+  const str = String(s);
+  // Escape double quotes and wrap in quotes if contains comma, newline, or quote
+  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
 }
 
 // ─── Export dropdown ───

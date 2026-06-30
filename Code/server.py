@@ -15,6 +15,7 @@ With Cloudflare Tunnel (access from phone):
 """
 
 import http.server
+import io
 import json
 import os
 import re
@@ -24,6 +25,9 @@ import urllib.request
 import uuid
 from pathlib import Path
 from urllib.parse import urlparse
+
+# ─── Export generators (PDF / DOCX) ───
+from python.exporter import generate_pdf_bytes, generate_docx_bytes
 
 # ─── Configuration ───
 
@@ -258,6 +262,52 @@ class PipelineHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"fileName": filename, "saved": True})
             except OSError as e:
                 self.send_error(500, f"Failed to save export: {e}")
+            return
+
+        # ── API: Export as PDF ──
+        if path == "/api/export/pdf":
+            try:
+                data = self._read_body()
+                stage_data = data.get("stageData", {})
+                pipeline_def = data.get("pipelineDef", [])
+                timestamp = time.strftime("%Y-%m-%dT%H-%M-%S")
+                title = f"Pipeline Export - {timestamp}"
+                pdf_bytes = generate_pdf_bytes(stage_data, pipeline_def, title=title)
+                filename = f"pipeline-export-{timestamp}.pdf"
+                self.send_response(200)
+                self.send_header("Content-Type", "application/pdf")
+                self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+                self.send_header("Content-Length", str(len(pdf_bytes)))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(pdf_bytes)
+                print(f"[{self.log_date_time_string()}] Generated PDF: {filename} ({len(pdf_bytes)} bytes)")
+            except Exception as e:
+                print(f"[{self.log_date_time_string()}] PDF export error: {e}")
+                self._send_json({"error": str(e)}, status=500)
+            return
+
+        # ── API: Export as DOCX ──
+        if path == "/api/export/docx":
+            try:
+                data = self._read_body()
+                stage_data = data.get("stageData", {})
+                pipeline_def = data.get("pipelineDef", [])
+                timestamp = time.strftime("%Y-%m-%dT%H-%M-%S")
+                title = f"Pipeline Export - {timestamp}"
+                docx_bytes = generate_docx_bytes(stage_data, pipeline_def, title=title)
+                filename = f"pipeline-export-{timestamp}.docx"
+                self.send_response(200)
+                self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+                self.send_header("Content-Length", str(len(docx_bytes)))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(docx_bytes)
+                print(f"[{self.log_date_time_string()}] Generated DOCX: {filename} ({len(docx_bytes)} bytes)")
+            except Exception as e:
+                print(f"[{self.log_date_time_string()}] DOCX export error: {e}")
+                self._send_json({"error": str(e)}, status=500)
             return
 
         # ── Ollama proxy (chat/completions) ──
