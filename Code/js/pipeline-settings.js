@@ -241,16 +241,24 @@ function importPipelineJSON(file) {
 }
 
 // ─── PDF Export ───
-function exportPDF() {
+async function exportPDF() {
   const html2canvasScript = document.createElement('script');
   html2canvasScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-  html2canvasScript.onload = function() {
+  html2canvasScript.onload = async function() {
     const jsPDFScript = document.createElement('script');
     jsPDFScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-    jsPDFScript.onload = function() {
+    jsPDFScript.onload = async function() {
       const stage = PIPELINE[currentStage - 1];
       const contentEl = document.getElementById('content');
-      
+
+      let savedS1ViewMode = null;
+      if (stage.id === 1 && typeof s1ViewMode !== 'undefined' && s1ViewMode === 'wizard') {
+        savedS1ViewMode = s1ViewMode;
+        s1ViewMode = 'full';
+        renderStage();
+        await new Promise(r => setTimeout(r, 350));
+      }
+
       // Collect all collapsible/hidden elements and their original states
       const hiddenElements = [];
       const selectors = [
@@ -261,13 +269,14 @@ function exportPDF() {
         '[style*="display:none"]',
         '.hidden'
       ];
-      
+
       document.querySelectorAll(selectors.join(', ')).forEach(el => {
         if (el.closest('#content') || el.closest('#content *')) {
           hiddenElements.push({
             el: el,
             originalDisplay: el.style.display,
-            originalClass: el.className
+            originalClass: el.className,
+            originalHidden: el.classList.contains('hidden')
           });
           el.style.display = 'block';
           el.classList.remove('hidden');
@@ -307,8 +316,7 @@ function exportPDF() {
 
         pdf.save(`stage-${stage.id}-${stage.name.replace(/[^a-zA-Z0-9]/g,'-')}.pdf`);
         document.body.removeChild(clone);
-        
-        // Restore original hidden state of elements
+
         hiddenElements.forEach(item => {
           if (item.originalDisplay) {
             item.el.style.display = item.originalDisplay;
@@ -319,12 +327,16 @@ function exportPDF() {
             item.el.className = item.originalClass;
           }
         });
-        
+
+        if (savedS1ViewMode !== null && typeof s1ViewMode !== 'undefined') {
+          s1ViewMode = savedS1ViewMode;
+          renderStage();
+        }
+
         showToast('PDF exported ✓');
       }).catch(err => {
         document.body.removeChild(clone);
-        
-        // Restore original hidden state even on error
+
         hiddenElements.forEach(item => {
           if (item.originalDisplay) {
             item.el.style.display = item.originalDisplay;
@@ -335,7 +347,12 @@ function exportPDF() {
             item.el.className = item.originalClass;
           }
         });
-        
+
+        if (savedS1ViewMode !== null && typeof s1ViewMode !== 'undefined') {
+          s1ViewMode = savedS1ViewMode;
+          renderStage();
+        }
+
         showToast('PDF export failed: ' + err.message);
       });
     };

@@ -6,6 +6,7 @@
 let s1FlatQuestions = [];
 let s1CurrentQuestion = 0;
 let s1FlowContext = { count: 0, names: [], summaries: [], scoping: [] };
+let s1ViewMode = 'wizard'; // 'wizard' | 'full'
 
 /** Derive scoping options from infrastructure selections */
 function getActiveScopingOptions() {
@@ -305,10 +306,15 @@ function countSectionAnswered(sectionId) {
   return [answered, total];
 }
 
-// ─── Main Stage 1 Renderer — single question per page ───
+// ─── Main Stage 1 Renderer ───
 
 function renderStage1PRD(content) {
   const sd = stageData[1];
+
+  if (s1ViewMode === 'full') {
+    renderStage1FullView(content);
+    return;
+  }
 
   // Build flattened question list
   s1FlatQuestions = buildFlatQuestionList();
@@ -328,6 +334,12 @@ function renderStage1PRD(content) {
   stageBar.id = 's1-stage-bar';
   content.appendChild(stageBar);
 
+  // View toggle button
+  const toggleDiv = document.createElement('div');
+  toggleDiv.style.cssText = 'text-align:right;padding:4px 0;';
+  toggleDiv.innerHTML = `<button class="btn btn-sm" onclick="s1SwitchView('full')" title="View full document with all sections expanded">📄 Full Document View</button>`;
+  content.appendChild(toggleDiv);
+
   // Question card
   const card = document.createElement('div');
   card.className = 's1-question-card';
@@ -341,6 +353,89 @@ function renderStage1PRD(content) {
   content.appendChild(nav);
 
   renderSingleQuestion();
+}
+
+function s1SwitchView(mode) {
+  s1ViewMode = mode;
+  saveStage1Inputs();
+  renderStage();
+}
+
+/** Render full expanded document view (all accordions open, like other stages) */
+function renderStage1FullView(content) {
+  const sd = stageData[1];
+
+  // Build flattened question list to ensure data is fresh
+  s1FlatQuestions = buildFlatQuestionList();
+  buildS1FlowContext();
+
+  // Stage progress bar
+  const stageBar = document.createElement('div');
+  stageBar.className = 's1-stage-bar';
+  stageBar.id = 's1-stage-bar';
+  content.appendChild(stageBar);
+
+  // View toggle button
+  const toggleDiv = document.createElement('div');
+  toggleDiv.style.cssText = 'text-align:right;padding:4px 0;';
+  toggleDiv.innerHTML = `<button class="btn btn-sm btn-primary" onclick="s1SwitchView('wizard')" title="Switch to single-question wizard mode">🧙 Wizard Mode</button>`;
+  content.appendChild(toggleDiv);
+
+  // Title
+  const title = document.createElement('div');
+  title.className = 'stage-title';
+  title.innerHTML = `<h2>📝 Stage 1: PRD — Product Requirements Document</h2>`;
+  content.appendChild(title);
+
+  // Statement: "Complete all sections, then run D5 → D4"
+  const statement = document.createElement('div');
+  statement.className = 's1-statement';
+  statement.innerHTML = `<div class="s1-statement-icon">📌</div><div>Complete all sections below. When finished, use <strong>Run D5 Auto-Checks</strong> to validate consistency, then <strong>Generate D4 Context Diagram</strong>.</div>`;
+  content.appendChild(statement);
+
+  // Render all PRD sections as expanded accordions
+  const allSections = [
+    ...STAGE1_PRD_DELIVERABLES,
+    STAGE1_INFRASTRUCTURE_SECTION,
+    STAGE1_EXTERNAL_SECTION
+  ];
+
+  allSections.forEach(section => {
+    if (section.id === 'section_basics' || section.id === 'section_github' || section.id === 'section_functions') {
+      renderAccordionSection(section, content);
+    }
+  });
+
+  // Infrastructure section
+  renderInfrastructureSection(content);
+
+  // Function instances (if any)
+  if (sd.functionCount > 0) {
+    const funcsContainer = document.createElement('div');
+    funcsContainer.className = 's1-accordion';
+    funcsContainer.innerHTML = `
+      <div class="s1-accordion-header open" onclick="toggleAccordion(this)">
+        <div class="s1-accordion-title">
+          <span>⚙️ Functions Detail (${sd.functionCount})</span>
+        </div>
+        <div class="s1-accordion-toggle">▼</div>
+      </div>
+      <div class="s1-accordion-body" style="display:block">
+        <div class="s1-items" id="s1-func-instances"></div>
+      </div>`;
+    content.appendChild(funcsContainer);
+    const funcsItems = funcsContainer.querySelector('#s1-func-instances');
+    renderFunctionInstances(sd.functionCount, funcsItems);
+  }
+
+  // External linkages section
+  renderExternalSection(content);
+
+  // D5 section
+  renderD5Section(content);
+
+  // D4 section
+  renderD4Section(content);
 }
 
 function renderSingleQuestion() {
